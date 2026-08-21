@@ -6,5 +6,8 @@
   "packageManager": "npm@10.9.3",
   "engines": {
     "node": ">=22.19.0 <23"
+  },
+  "scripts": {
+    "challenge": "node challenge.js"
   }
 }
