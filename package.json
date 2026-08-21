@@ -1,0 +1,10 @@
+{
+  "name": "agentcofounder-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.9.3",
+  "engines": {
+    "node": ">=22.19.0 <23"
+  }
+}
