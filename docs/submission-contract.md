@@ -10,13 +10,13 @@ This document records the external contract that this repository must satisfy to
 
 AgentCofounder is a Stockholm AI open-source hackathon to build an autonomous coding harness that turns a raw startup idea into a working, tested application.
 
-- [Official challenge portal](https://luma.com/cjgfx089)
+- [Official hackathon website](https://agentcofounder.stockholm.ai/)
 - [Official Stockholm AI starter repository](https://github.com/stockholm-ai/agentcofounder)
 - [Starter contract and run instructions](https://github.com/stockholm-ai/agentcofounder/blob/main/README.md)
 - [Public result schema](https://github.com/stockholm-ai/agentcofounder/blob/main/contract-public/result.schema.json)
 - [Organizer checklist](https://github.com/stockholm-ai/agentcofounder/blob/main/docs/organizer-checklist.md)
 
-The portal currently identifies the event and dates but marks full details and rules as coming soon. The starter repository is therefore the current official source for the technical contract below. Items are separated into confirmed requirements and pending organizer publication.
+The hackathon website publishes the challenge overview and technical specification, while the starter repository provides the runnable public contract. Where these official sources differ, this document records the discrepancy as pending organizer clarification rather than choosing one silently.
 
 ## Confirmed runtime and submission constraints
 
@@ -69,12 +69,11 @@ Official material requires a fresh isolated container or VM, a read-only harness
 
 ## Pending organizer publication or clarification
 
-- Finalized public development prompt and the full public challenge rules.
+- Confirmation that the public development prompt shown on the hackathon website is finalized and will replace the starter's committed development placeholder.
 - Exact judging runtime image digest beyond the currently published Node/npm/Pi versions.
 - Designated provider and model identifier, final thinking level, and credential/gateway configuration.
 - Exact timeout, CPU, memory, disk, and network limits.
-- Cache-write token weighting.
-- The single authoritative efficiency ranking method: custom weighted-token formula or Pi provider cost.
+- Reconciliation of the weighted-token formula published on the hackathon website with the starter checklist, which still says cache-write weighting and the authoritative ranking method must be decided and published.
 - Exact submission delivery mechanism beyond freezing a participant commit SHA.
 
 Until these items are published, they must remain configurable or explicitly unresolved rather than being treated as submission facts.
