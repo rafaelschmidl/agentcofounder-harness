@@ -32,6 +32,7 @@ export function executionGuardDecision(payload, model, overrides = {}) {
     maxOutputTokens: overrides.maxOutputTokens ?? DEFAULT_EXECUTION_GUARDS.maxOutputTokens,
     maxRequestBytes: overrides.maxRequestBytes ?? DEFAULT_EXECUTION_GUARDS.maxRequestBytes,
     maxProjectedCostEur: overrides.maxProjectedCostEur ?? DEFAULT_EXECUTION_GUARDS.maxProjectedCostEur,
+    expectedProvider: overrides.expectedProvider ?? null,
     expectedModel: overrides.expectedModel ?? null,
   };
   let serialized;
@@ -62,6 +63,7 @@ export function executionGuardDecision(payload, model, overrides = {}) {
     selectedModel,
     expectedModel: limits.expectedModel,
     provider,
+    expectedProvider: limits.expectedProvider,
     maxProviderRequests: limits.maxProviderRequests,
     maxOutputTokens: limits.maxOutputTokens,
     inputRatePerMillion,
@@ -75,7 +77,7 @@ export function executionGuardDecision(payload, model, overrides = {}) {
   if (requestBytes > limits.maxRequestBytes) {
     return { accepted: false, reason: "request-byte-limit-exceeded", ...evidence };
   }
-  if (provider !== "berget") {
+  if (limits.expectedProvider && provider !== limits.expectedProvider) {
     return { accepted: false, reason: "selected-provider-unexpected", ...evidence };
   }
   if (limits.expectedModel && selectedModel !== limits.expectedModel) {
@@ -127,6 +129,7 @@ export default function runtimeGuardExtension(pi) {
       "AGENTCOFOUNDER_MAX_PROJECTED_COST_EUR",
       DEFAULT_EXECUTION_GUARDS.maxProjectedCostEur,
     ),
+    expectedProvider: process.env.CHALLENGE_PROVIDER ?? null,
     expectedModel: process.env.AGENTCOFOUNDER_EXPECTED_MODEL ?? null,
   };
   let providerRequestCount = 0;
