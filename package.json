@@ -8,6 +8,14 @@
     "node": ">=22.19.0 <23"
   },
   "scripts": {
-    "challenge": "node challenge.js"
+    "challenge": "node challenge.js",
+    "qualification": "node qualification.js",
+    "test": "node --test test/*.test.js",
+    "check": "npm test"
+  },
+  "dependencies": {
+    "@bergetai/pi-provider": "0.3.2",
+    "@earendil-works/pi-ai": "0.84.1",
+    "@earendil-works/pi-coding-agent": "0.84.1"
   }
 }

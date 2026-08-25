@@ -4,5 +4,6 @@ This repository is the AgentCofounder submission surface. Its `main` branch is i
 
 - [Submission contract](docs/submission-contract.md)
 - [Collaboration workflow](docs/collaboration.md)
+- [Local Pi runtime configuration](docs/runtime-configuration.md)
 - [Official hackathon website](https://agentcofounder.stockholm.ai/)
 - [Official Stockholm AI starter repository](https://github.com/stockholm-ai/agentcofounder)
