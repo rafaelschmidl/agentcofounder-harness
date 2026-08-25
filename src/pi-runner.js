@@ -159,7 +159,7 @@ export function terminateProcessTree(child, signal = "SIGTERM") {
 
 /**
  * Run a prepared Pi invocation with bounded output and process-tree cleanup.
- * This is intentionally generic enough for synthetic Gate A subprocess tests.
+ * This is intentionally generic enough for synthetic offline-preflight tests.
  */
 export function runPiInvocation(
   invocation,
@@ -203,13 +203,10 @@ export function runPiInvocation(
     let settled = false;
     let killTimer;
     let pendingClose;
+    let closeCleanupStarted = false;
 
-    const finish = (code, signal) => {
+    const resolveResult = (code, signal) => {
       if (settled) return;
-      if (timedOut && killTimer !== undefined) {
-        pendingClose = { code, signal };
-        return;
-      }
       settled = true;
       clearTimeout(timeoutTimer);
       clearTimeout(killTimer);
@@ -227,6 +224,28 @@ export function runPiInvocation(
         endedAt: new Date().toISOString(),
         durationMs: Date.now() - started,
       });
+    };
+
+    const finish = (code, signal) => {
+      if (settled) return;
+      if (timedOut && killTimer !== undefined) {
+        pendingClose = { code, signal };
+        return;
+      }
+      if (!timedOut && !closeCleanupStarted) {
+        closeCleanupStarted = true;
+        termSent = terminateProcessTree(child, "SIGTERM");
+        if (termSent) {
+          clearTimeout(timeoutTimer);
+          killTimer = setTimeout(() => {
+            killSent = terminateProcessTree(child, "SIGKILL");
+            killTimer = undefined;
+            resolveResult(code, signal);
+          }, killGraceMs);
+          return;
+        }
+      }
+      resolveResult(code, signal);
     };
 
     child.stdout?.setEncoding("utf8");
@@ -259,7 +278,7 @@ export function runPiInvocation(
         killSent = terminateProcessTree(child, "SIGKILL");
         const closed = pendingClose;
         killTimer = undefined;
-        if (closed) finish(closed.code, closed.signal);
+        if (closed) resolveResult(closed.code, closed.signal);
       }, killGraceMs);
     }, timeoutMs);
     timeoutTimer.unref?.();

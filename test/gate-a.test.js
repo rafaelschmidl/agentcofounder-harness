@@ -32,7 +32,12 @@ import {
   runPiInvocation,
 } from "../src/pi-runner.js";
 import { redactText, redactValue, writeRuntimeEvidence } from "../src/evidence.js";
-import runtimeGuardExtension, { guardBashEnvironment } from "../src/runtime-guard-extension.js";
+import runtimeGuardExtension, {
+  DEFAULT_EXECUTION_GUARDS,
+  executionGuardDecision,
+  guardBashEnvironment,
+} from "../src/runtime-guard-extension.js";
+import { buildChallengePrompt } from "../src/prompt.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -282,6 +287,38 @@ test("normal Pi invocation is a safe exact argv with conditional Berget loading 
   assert.match(otherInvocation.runtimeGuardExtension, /runtime-guard-extension\.js$/u);
 });
 
+test("normal challenge prompt fixes the runnable app contract while preserving the product brief", () => {
+  const prompt = buildChallengePrompt("Track equipment loans with durable persistence.\n");
+  assert.match(prompt, /npm test/u);
+  assert.match(prompt, /npm run build/u);
+  assert.match(prompt, /127\.0\.0\.1 --port 3000/u);
+  assert.match(prompt, /Track equipment loans with durable persistence\./u);
+});
+
+test("normal provider guard fixes model, request, output, and projected-cost bounds", () => {
+  const decision = executionGuardDecision(
+    { messages: [{ role: "user", content: "build" }], max_tokens: 4_096 },
+    qualificationModel({ input: 1, output: 2 }),
+    { expectedModel: EXPECTED_QUALIFICATION_MODEL },
+  );
+  assert.equal(decision.accepted, true);
+  assert.equal(decision.maxProviderRequests, DEFAULT_EXECUTION_GUARDS.maxProviderRequests);
+  assert.equal(decision.maxOutputTokens, DEFAULT_EXECUTION_GUARDS.maxOutputTokens);
+  assert.equal(decision.projectedTotalCostEur < 2, true);
+  assert.equal(
+    executionGuardDecision({}, qualificationModel({}, { id: "unexpected/model" }), {
+      expectedModel: EXPECTED_QUALIFICATION_MODEL,
+    }).reason,
+    "selected-model-unexpected",
+  );
+  assert.equal(
+    executionGuardDecision({}, qualificationModel({ input: undefined }), {
+      expectedModel: EXPECTED_QUALIFICATION_MODEL,
+    }).reason,
+    "pricing-metadata-missing",
+  );
+});
+
 test("Pi environment is minimal and the normal bash override cannot expose runtime controls or credentials", async () => {
   const root = await mkdtemp(join(tmpdir(), "agentcofounder-runtime-guard-"));
   const configuration = readRuntimeConfiguration(bergetEnvironment());
@@ -425,7 +462,10 @@ test("Pi environment is minimal and the normal bash override cannot expose runti
   }));
   try {
     let bashTool;
-    runtimeGuardExtension({ registerTool(tool) { bashTool = tool; } });
+    runtimeGuardExtension({
+      on() {},
+      registerTool(tool) { bashTool = tool; },
+    });
     const artifact = join(root, "bash-env.json");
     const script = [
       "const fs=require('node:fs');",
@@ -602,6 +642,31 @@ test("synthetic runner bounds output and kills a real detached process tree with
   assert.equal(result.stdoutTruncated, true);
   assert.equal(Buffer.byteLength(result.stdout, "utf8") <= 512, true);
   const descendantPid = Number(result.stdout.split(/\r?\n/u)[0]);
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+  assert.throws(() => process.kill(descendantPid, 0), /ESRCH/u);
+});
+
+test("successful Pi parent exit still removes surviving detached-group descendants", async () => {
+  const script = [
+    "const { spawn } = require('node:child_process');",
+    "const child = spawn(process.execPath, ['-e', `process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)`], { stdio: 'ignore' });",
+    "child.unref();",
+    "process.stdout.write(String(child.pid));",
+  ].join("\n");
+  const result = await runPiInvocation({
+    command: process.execPath,
+    args: ["-e", script],
+    cwd: process.cwd(),
+    shell: false,
+    detached: true,
+  }, {
+    timeoutMs: 2_000,
+    killGraceMs: 60,
+  });
+  assert.equal(result.code, 0);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.termSent, true);
+  const descendantPid = Number(result.stdout);
   await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
   assert.throws(() => process.kill(descendantPid, 0), /ESRCH/u);
 });

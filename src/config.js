@@ -20,6 +20,15 @@ export const RUNTIME_ENVIRONMENT_NAMES = Object.freeze([
   "BERGET_INFERENCE_URL",
 ]);
 
+export const EXECUTION_GUARD_ENVIRONMENT_NAMES = Object.freeze([
+  "AGENTCOFOUNDER_EXPECTED_MODEL",
+  "AGENTCOFOUNDER_MAX_PROVIDER_REQUESTS",
+  "AGENTCOFOUNDER_MAX_OUTPUT_TOKENS",
+  "AGENTCOFOUNDER_MAX_REQUEST_BYTES",
+  "AGENTCOFOUNDER_MAX_PROJECTED_COST_EUR",
+  "AGENTCOFOUNDER_RUNTIME_OBSERVATION",
+]);
+
 export const QUALIFICATION_ENVIRONMENT_NAMES = Object.freeze([
   "QUALIFICATION_NONCE",
   "QUALIFICATION_ARTIFACT",
@@ -207,7 +216,7 @@ export function runtimeConfigurationMetadata(configuration) {
 
 export function getRuntimeEnvironment(configuration, environment = process.env) {
   const result = {};
-  for (const name of RUNTIME_ENVIRONMENT_NAMES) {
+  for (const name of [...RUNTIME_ENVIRONMENT_NAMES, ...EXECUTION_GUARD_ENVIRONMENT_NAMES]) {
     if (typeof environment[name] === "string") result[name] = environment[name];
   }
   result.CHALLENGE_PROVIDER = configuration.provider;

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { readRuntimeConfiguration, runtimeConfigurationMetadata } from "./src/config.js";
 import { executeConfiguredPi } from "./src/execution.js";
 import { redactText } from "./src/evidence.js";
+import { buildChallengePrompt } from "./src/prompt.js";
 import { defaultWorkspaceRoot, prepareWorkspace } from "./src/workspace.js";
 
 const usage =
@@ -84,7 +85,7 @@ async function main() {
     execution = await executeConfiguredPi({
       environment: process.env,
       configuration,
-      prompt: idea,
+      prompt: buildChallengePrompt(idea),
       workspaceRoot,
     });
 
