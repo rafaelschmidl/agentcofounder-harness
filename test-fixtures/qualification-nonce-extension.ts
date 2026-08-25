@@ -11,11 +11,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export const MAX_QUALIFICATION_OUTPUT_TOKENS = 1_024;
 export const MAX_QUALIFICATION_REQUEST_BYTES = 64 * 1_024;
-export const MAX_QUALIFICATION_INPUT_RATE_PER_MILLION = 0.40;
-export const MAX_QUALIFICATION_OUTPUT_RATE_PER_MILLION = 3.00;
+export const MAX_QUALIFICATION_PROVIDER_RESPONSES = 2;
 export const EXPECTED_QUALIFICATION_MODEL = "Qwen/Qwen3.8-27B-FP8";
 
-const EXPECTED_COST_KEYS = ["cacheRead", "cacheWrite", "input", "output"];
 const COST_RATE_BASIS = "provider-0.3.2-pi-per-million-tokens";
 
 type RequestGuardDecision = {
@@ -30,8 +28,13 @@ type RequestGuardDecision = {
   outputRatePerMillion: number | null;
   cacheReadRatePerMillion: number | null;
   cacheWriteRatePerMillion: number | null;
-  maxInputRatePerMillion: number;
-  maxOutputRatePerMillion: number;
+  maxProviderResponses: number;
+  maxOutputTokensPerResponse: number;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  projectedInputCostEur: number | null;
+  projectedOutputCostEur: number | null;
+  projectedTotalCostEur: number | null;
   selectedModelId: string | null;
   expectedModelId: string;
 };
@@ -52,8 +55,13 @@ function rejectedDecision(
     outputRatePerMillion: null,
     cacheReadRatePerMillion: null,
     cacheWriteRatePerMillion: null,
-    maxInputRatePerMillion: MAX_QUALIFICATION_INPUT_RATE_PER_MILLION,
-    maxOutputRatePerMillion: MAX_QUALIFICATION_OUTPUT_RATE_PER_MILLION,
+    maxProviderResponses: MAX_QUALIFICATION_PROVIDER_RESPONSES,
+    maxOutputTokensPerResponse: MAX_QUALIFICATION_OUTPUT_TOKENS,
+    maxInputTokens: MAX_QUALIFICATION_REQUEST_BYTES * MAX_QUALIFICATION_PROVIDER_RESPONSES,
+    maxOutputTokens: MAX_QUALIFICATION_OUTPUT_TOKENS * MAX_QUALIFICATION_PROVIDER_RESPONSES,
+    projectedInputCostEur: null,
+    projectedOutputCostEur: null,
+    projectedTotalCostEur: null,
     selectedModelId: null,
     expectedModelId: EXPECTED_QUALIFICATION_MODEL,
     ...partial,
@@ -66,8 +74,8 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function finiteRate(value: unknown, { positive = false } = {}): value is number {
-  return typeof value === "number" && Number.isFinite(value) && (positive ? value > 0 : value >= 0);
+function finiteRate(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 /**
@@ -102,18 +110,11 @@ export function qualificationRequestGuardDecision(
       selectedModelId: typeof model.id === "string" ? model.id : null,
     });
   }
-  if (!isPlainRecord(model.cost)) {
-    return rejectedDecision("selected-model-cost-shape-unexpected", { requestBytes });
-  }
-  const keys = Object.keys(model.cost).sort();
-  if (JSON.stringify(keys) !== JSON.stringify(EXPECTED_COST_KEYS)) {
-    return rejectedDecision("selected-model-cost-keys-unexpected", { requestBytes });
-  }
-
-  const input = model.cost.input;
-  const output = model.cost.output;
-  const cacheRead = model.cost.cacheRead;
-  const cacheWrite = model.cost.cacheWrite;
+  const cost = isPlainRecord(model.cost) ? model.cost : {};
+  const input = cost.input;
+  const output = cost.output;
+  const cacheRead = cost.cacheRead;
+  const cacheWrite = cost.cacheWrite;
   const rates = {
     requestBytes,
     selectedModelId: model.id,
@@ -122,26 +123,30 @@ export function qualificationRequestGuardDecision(
     cacheReadRatePerMillion: finiteRate(cacheRead) ? cacheRead : null,
     cacheWriteRatePerMillion: finiteRate(cacheWrite) ? cacheWrite : null,
   };
-  if (!finiteRate(input, { positive: true })) {
-    return rejectedDecision("input-rate-missing-or-invalid", rates);
-  }
-  if (!finiteRate(output, { positive: true })) {
-    return rejectedDecision("output-rate-missing-or-invalid", rates);
-  }
-  if (!finiteRate(cacheRead) || !finiteRate(cacheWrite)) {
-    return rejectedDecision("cache-rate-invalid", rates);
-  }
-  if (cacheRead !== 0 || cacheWrite !== 0) {
-    return rejectedDecision("cache-rate-not-covered-by-qualification-budget", rates);
-  }
-  if (input > MAX_QUALIFICATION_INPUT_RATE_PER_MILLION) {
-    return rejectedDecision("input-rate-limit-exceeded", rates);
-  }
-  if (output > MAX_QUALIFICATION_OUTPUT_RATE_PER_MILLION) {
-    return rejectedDecision("output-rate-limit-exceeded", rates);
-  }
+  const maxInputTokens = MAX_QUALIFICATION_REQUEST_BYTES * MAX_QUALIFICATION_PROVIDER_RESPONSES;
+  const maxOutputTokens = MAX_QUALIFICATION_OUTPUT_TOKENS * MAX_QUALIFICATION_PROVIDER_RESPONSES;
+  const projectedInputCostEur = finiteRate(input)
+    ? maxInputTokens * input / 1e6
+    : null;
+  const projectedOutputCostEur = finiteRate(output)
+    ? maxOutputTokens * output / 1e6
+    : null;
+  const projectedTotalCostEur = Number.isFinite(projectedInputCostEur) &&
+      Number.isFinite(projectedOutputCostEur)
+    ? projectedInputCostEur + projectedOutputCostEur
+    : null;
+  const projection = {
+    ...rates,
+    maxProviderResponses: MAX_QUALIFICATION_PROVIDER_RESPONSES,
+    maxOutputTokensPerResponse: MAX_QUALIFICATION_OUTPUT_TOKENS,
+    maxInputTokens,
+    maxOutputTokens,
+    projectedInputCostEur: Number.isFinite(projectedInputCostEur) ? projectedInputCostEur : null,
+    projectedOutputCostEur: Number.isFinite(projectedOutputCostEur) ? projectedOutputCostEur : null,
+    projectedTotalCostEur: Number.isFinite(projectedTotalCostEur) ? projectedTotalCostEur : null,
+  };
   return {
-    ...rejectedDecision("accepted", rates),
+    ...rejectedDecision("accepted", projection),
     accepted: true,
   };
 }
@@ -160,7 +165,7 @@ export default function qualificationNonceExtension(pi: ExtensionAPI) {
 
   pi.on("before_provider_request", async (event, ctx) => {
     providerRequestCount += 1;
-    if (providerRequestCount > 2) {
+    if (providerRequestCount > MAX_QUALIFICATION_PROVIDER_RESPONSES) {
       ctx.abort();
       return event.payload;
     }

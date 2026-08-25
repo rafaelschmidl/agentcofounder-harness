@@ -9,9 +9,8 @@ import { clampThinkingLevel, getSupportedThinkingLevels } from "@earendil-works/
 import { stream as streamOpenAICompletions } from "@earendil-works/pi-ai/api/openai-completions";
 import qualificationNonceExtension, {
   EXPECTED_QUALIFICATION_MODEL,
-  MAX_QUALIFICATION_INPUT_RATE_PER_MILLION,
   MAX_QUALIFICATION_OUTPUT_TOKENS,
-  MAX_QUALIFICATION_OUTPUT_RATE_PER_MILLION,
+  MAX_QUALIFICATION_PROVIDER_RESPONSES,
   MAX_QUALIFICATION_REQUEST_BYTES,
   qualificationRequestGuardDecision,
 } from "../test-fixtures/qualification-nonce-extension.ts";
@@ -701,8 +700,17 @@ test("qualification fixture enforces reveal then nonce-bearing persist and termi
       outputRatePerMillion: 2.50,
       cacheReadRatePerMillion: 0,
       cacheWriteRatePerMillion: 0,
-      maxInputRatePerMillion: MAX_QUALIFICATION_INPUT_RATE_PER_MILLION,
-      maxOutputRatePerMillion: MAX_QUALIFICATION_OUTPUT_RATE_PER_MILLION,
+      maxProviderResponses: MAX_QUALIFICATION_PROVIDER_RESPONSES,
+      maxOutputTokensPerResponse: MAX_QUALIFICATION_OUTPUT_TOKENS,
+      maxInputTokens: MAX_QUALIFICATION_REQUEST_BYTES * MAX_QUALIFICATION_PROVIDER_RESPONSES,
+      maxOutputTokens: MAX_QUALIFICATION_OUTPUT_TOKENS * MAX_QUALIFICATION_PROVIDER_RESPONSES,
+      projectedInputCostEur:
+        MAX_QUALIFICATION_REQUEST_BYTES * MAX_QUALIFICATION_PROVIDER_RESPONSES * 0.30 / 1e6,
+      projectedOutputCostEur:
+        MAX_QUALIFICATION_OUTPUT_TOKENS * MAX_QUALIFICATION_PROVIDER_RESPONSES * 2.50 / 1e6,
+      projectedTotalCostEur:
+        (MAX_QUALIFICATION_REQUEST_BYTES * MAX_QUALIFICATION_PROVIDER_RESPONSES * 0.30 +
+          MAX_QUALIFICATION_OUTPUT_TOKENS * MAX_QUALIFICATION_PROVIDER_RESPONSES * 2.50) / 1e6,
       selectedModelId: EXPECTED_QUALIFICATION_MODEL,
       expectedModelId: EXPECTED_QUALIFICATION_MODEL,
     });
@@ -718,22 +726,61 @@ test("qualification fixture enforces reveal then nonce-bearing persist and termi
   }
 });
 
-test("qualification cost guard accepts only bounded official provider cost shape", () => {
+test("qualification cost metadata is optional and records a bounded projection", () => {
   for (const payload of [
     { messages: [{ role: "user", content: "bounded" }] },
     jsonPayloadWithExactBytes(MAX_QUALIFICATION_REQUEST_BYTES),
   ]) {
-    const decision = qualificationRequestGuardDecision(payload, qualificationModel({
-      input: MAX_QUALIFICATION_INPUT_RATE_PER_MILLION,
-      output: MAX_QUALIFICATION_OUTPUT_RATE_PER_MILLION,
-    }));
+    const decision = qualificationRequestGuardDecision(
+      payload,
+      qualificationModel({ input: 1.00, output: 2.00 }),
+    );
     assert.equal(decision.accepted, true);
     assert.equal(decision.requestBytes <= MAX_QUALIFICATION_REQUEST_BYTES, true);
     assert.equal(decision.providerConfirmedCurrency, null);
+    assert.equal(decision.maxProviderResponses, MAX_QUALIFICATION_PROVIDER_RESPONSES);
+    assert.equal(decision.maxInputTokens, 131_072);
+    assert.equal(decision.maxOutputTokens, 2_048);
+    assert.equal(decision.projectedInputCostEur, 131_072 / 1e6);
+    assert.equal(decision.projectedOutputCostEur, 2_048 * 2 / 1e6);
+    assert.equal(decision.projectedTotalCostEur, 131_072 / 1e6 + 2_048 * 2 / 1e6);
   }
 });
 
-test("qualification cost guard aborts before synthetic provider invocation for unsafe requests", async () => {
+test("qualification cost metadata never aborts and invalid values are sanitized", async () => {
+  const cases = [
+    { name: "missing cost object", payload: {}, model: qualificationModel({}, { cost: undefined }) },
+    { name: "zero output rate", payload: {}, model: qualificationModel({ output: 0 }) },
+    { name: "high rates", payload: {}, model: qualificationModel({ input: 1, output: 58.0703125000001 }) },
+    { name: "unexpected unit key", payload: {}, model: qualificationModel({ unit: "per-token" }) },
+    { name: "nonzero cache rate", payload: {}, model: qualificationModel({ cacheRead: 0.01 }) },
+    { name: "invalid cost value", payload: {}, model: qualificationModel({ output: Number.NaN }) },
+    { name: "negative input rate", payload: {}, model: qualificationModel({ input: -1 }) },
+    { name: "negative cache rate", payload: {}, model: qualificationModel({ cacheRead: -1 }) },
+    { name: "nonfinite projected cost", payload: {}, model: qualificationModel({ input: Number.MAX_VALUE }) },
+  ];
+
+  for (const scenario of cases) {
+    const handlers = new Map();
+    qualificationNonceExtension({
+      on(name, handler) { handlers.set(name, handler); },
+      registerTool() {},
+    });
+    let aborted = false;
+    const payload = await handlers.get("before_provider_request")(
+      { payload: scenario.payload },
+      {
+        model: scenario.model,
+        thinkingLevel: "medium",
+        abort() { aborted = true; },
+      },
+    );
+    assert.equal(aborted, false, scenario.name);
+    assert.equal(payload.max_tokens, MAX_QUALIFICATION_OUTPUT_TOKENS, scenario.name);
+  }
+});
+
+test("qualification request and model guards still abort before synthetic provider invocation", async () => {
   const cases = [
     {
       name: "oversize request",
@@ -746,48 +793,6 @@ test("qualification cost guard aborts before synthetic provider invocation for u
       payload: {},
       model: qualificationModel({}, { id: "Qwen/Other" }),
       reason: "selected-model-id-unexpected",
-    },
-    {
-      name: "missing input rate",
-      payload: {},
-      model: qualificationModel({ input: undefined }),
-      reason: "input-rate-missing-or-invalid",
-    },
-    {
-      name: "zero output rate from coerced missing catalog data",
-      payload: {},
-      model: qualificationModel({ output: 0 }),
-      reason: "output-rate-missing-or-invalid",
-    },
-    {
-      name: "input rate above limit",
-      payload: {},
-      model: qualificationModel({ input: MAX_QUALIFICATION_INPUT_RATE_PER_MILLION + 0.001 }),
-      reason: "input-rate-limit-exceeded",
-    },
-    {
-      name: "output rate above limit",
-      payload: {},
-      model: qualificationModel({ output: MAX_QUALIFICATION_OUTPUT_RATE_PER_MILLION + 0.001 }),
-      reason: "output-rate-limit-exceeded",
-    },
-    {
-      name: "unexpected unit key",
-      payload: {},
-      model: qualificationModel({ unit: "per-token" }),
-      reason: "selected-model-cost-keys-unexpected",
-    },
-    {
-      name: "nonzero cache rate outside budget",
-      payload: {},
-      model: qualificationModel({ cacheRead: 0.01 }),
-      reason: "cache-rate-not-covered-by-qualification-budget",
-    },
-    {
-      name: "invalid cost value",
-      payload: {},
-      model: qualificationModel({ output: Number.NaN }),
-      reason: "output-rate-missing-or-invalid",
     },
   ];
 
