@@ -7,6 +7,7 @@ export function buildChallengePrompt(idea) {
     "Provide non-interactive `npm test`, `npm run build`, and `npm run dev -- --host 127.0.0.1 --port 3000` workflows.",
     "Do not require external services, accounts, API keys, or network access after dependencies are installed.",
     "Implement every explicit requirement in the product brief, including durable browser-local persistence when the brief requires persistence.",
+    "Before finishing, actually run `npm install --package-lock-only`, `npm test`, and `npm run build`; a lockfile is required even when the project has no dependencies.",
     "",
     "PRODUCT BRIEF",
     "-------------",

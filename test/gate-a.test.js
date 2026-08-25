@@ -291,6 +291,7 @@ test("normal challenge prompt fixes the runnable app contract while preserving t
   const prompt = buildChallengePrompt("Track equipment loans with durable persistence.\n");
   assert.match(prompt, /npm test/u);
   assert.match(prompt, /npm run build/u);
+  assert.match(prompt, /npm install --package-lock-only/u);
   assert.match(prompt, /127\.0\.0\.1 --port 3000/u);
   assert.match(prompt, /Track equipment loans with durable persistence\./u);
 });
