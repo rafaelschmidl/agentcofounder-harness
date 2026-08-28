@@ -1,0 +1,10 @@
+{
+  "id": "domain.saas-operations@1.0.0",
+  "title": "Solo SaaS operations workflow",
+  "summary": "Capture categorized and prioritized operational records, move them through a bounded workflow, and inspect status metrics.",
+  "signals": ["saas", "feedback", "request", "customer", "priority", "category", "inbox", "planned", "in progress", "shipped"],
+  "capabilities": ["feedback-capture", "priority", "category", "workflow-board", "operational-metrics"],
+  "defaults": ["Make category and priority explicit fields", "Keep workflow rules in domain logic", "Treat shipped as terminal unless requested otherwise"],
+  "risks": ["Unbounded status strings", "Skipping workflow stages", "Mixing filtered counts with global metrics"],
+  "verification": ["Capture a complete request", "Filter by priority and state", "Advance through every allowed stage"]
+}

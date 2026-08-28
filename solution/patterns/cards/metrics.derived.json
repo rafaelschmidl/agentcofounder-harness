@@ -1,0 +1,10 @@
+{
+  "id": "metrics.derived@1.0.0",
+  "title": "Derived collection metrics",
+  "summary": "Calculate counts and totals from canonical stored records rather than persisting duplicate aggregate state.",
+  "signals": ["count", "how many", "total", "active", "shipped", "lent", "dashboard", "metric"],
+  "capabilities": ["derived-count", "derived-total", "collection-summary"],
+  "defaults": ["Derive from the complete canonical collection", "Keep filtered views separate from global metrics"],
+  "risks": ["Stale duplicated counts", "Metrics based only on the filtered view", "Floating-point currency totals"],
+  "verification": ["Recalculate after each mutation", "Compare filtered and global counts", "Verify empty-state values"]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "persistence.local@1.0.0",
+  "title": "Versioned local persistence",
+  "summary": "Persist local single-user state through a versioned repository with safe parsing and malformed-data recovery.",
+  "signals": ["local", "own computer", "refresh", "reload", "persist", "survive", "saved", "storage", "single-user"],
+  "capabilities": ["local-storage", "schema-versioning", "malformed-data-recovery", "repository-interface"],
+  "defaults": ["Use an application-specific storage key", "Version the stored envelope", "Recover to an empty valid state"],
+  "risks": ["Malformed JSON preventing startup", "Silent data loss", "UI coupled directly to localStorage"],
+  "verification": ["Reload after mutations", "Seed malformed data and recover", "Preserve unrelated browser storage"]
+}

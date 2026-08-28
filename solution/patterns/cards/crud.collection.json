@@ -1,0 +1,10 @@
+{
+  "id": "crud.collection@1.0.0",
+  "title": "Validated record collection",
+  "summary": "Create, list, edit, delete, filter, and validate a collection of domain records behind a repository boundary.",
+  "signals": ["add", "create", "list", "collection", "edit", "update", "delete", "remove", "filter", "catalogue", "records"],
+  "capabilities": ["record-create", "record-list", "record-update", "record-delete", "filtering", "input-validation"],
+  "defaults": ["Generate stable identifiers", "Validate before mutation", "Keep domain mutations outside view components"],
+  "risks": ["Deleting the wrong record", "Accepting partial records", "Filters changing stored state"],
+  "verification": ["Create a complete record", "Reject an incomplete record", "Edit one record", "Delete only the selected record"]
+}

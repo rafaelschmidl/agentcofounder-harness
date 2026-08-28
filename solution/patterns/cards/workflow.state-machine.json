@@ -1,0 +1,10 @@
+{
+  "id": "workflow.state-machine@1.0.0",
+  "title": "Explicit state workflow",
+  "summary": "Represent ordered domain states and permitted transitions explicitly, rejecting skipped or backward transitions without mutation.",
+  "signals": ["workflow", "status", "state", "stage", "move", "advance", "return", "lend", "shipped", "inbox", "planned"],
+  "capabilities": ["state-machine", "transition-guards", "transition-effects", "invalid-transition-feedback"],
+  "defaults": ["Declare the initial state", "Allow only named transitions", "Keep rejected transitions side-effect free"],
+  "risks": ["Illegal state jumps", "Backward mutation", "UI-only enforcement"],
+  "verification": ["Exercise every allowed transition", "Reject a skipped transition", "Reject a forbidden backward transition"]
+}

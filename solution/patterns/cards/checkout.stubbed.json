@@ -1,0 +1,10 @@
+{
+  "id": "checkout.stubbed@1.0.0",
+  "title": "Deterministic payment-provider stub",
+  "summary": "Expose a provider interface with deterministic success and decline modes and no external payment network.",
+  "signals": ["payment", "checkout", "decline", "declined", "successful", "simulate", "stub", "fake payment", "no real payment"],
+  "capabilities": ["payment-provider-interface", "deterministic-success", "deterministic-decline", "no-network-payment"],
+  "defaults": ["Make the outcome selector explicit in demo UI", "Return typed provider results", "Never collect payment credentials"],
+  "risks": ["Accidental real-provider call", "Non-deterministic demos", "Treating decline as an order"],
+  "verification": ["Run deterministic success", "Run deterministic decline", "Assert no external request occurs"]
+}

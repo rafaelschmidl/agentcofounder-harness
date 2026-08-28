@@ -133,6 +133,7 @@ export async function runPi(
   eventFile: string,
   stderrFile: string,
   timeoutMs: number,
+  environment: NodeJS.ProcessEnv = process.env,
 ): Promise<CommandResult> {
   const events = createWriteStream(eventFile, { flags: "wx" });
   const errors = createWriteStream(stderrFile, { flags: "wx" });
@@ -150,7 +151,7 @@ export async function runPi(
       const child = spawn(piBinary, args, {
         cwd,
         detached: usesDetachedProcessGroup(),
-        env: { ...process.env, PI_OFFLINE: "1" },
+        env: { ...environment, PI_OFFLINE: "1" },
         shell: false,
         stdio: ["ignore", "pipe", "pipe"],
       });

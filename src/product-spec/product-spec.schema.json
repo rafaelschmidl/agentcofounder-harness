@@ -1,0 +1,282 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentcofounder.local/schema/product-spec-0.1.json",
+  "title": "System v0 ProductSpec",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "source_idea_hash",
+    "source_fragments",
+    "fragment_disposition",
+    "product",
+    "requirements",
+    "entities",
+    "workflows",
+    "persistence",
+    "integrations",
+    "views",
+    "acceptance_journeys",
+    "assumptions",
+    "exclusions",
+    "conflicts",
+    "selected_patterns"
+  ],
+  "properties": {
+    "version": { "const": "0.1" },
+    "source_idea_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "source_fragments": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/sourceFragment" }
+    },
+    "fragment_disposition": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/fragmentDisposition" }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "actors", "goals", "constraints"],
+      "properties": {
+        "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "actors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "description"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "$ref": "#/$defs/nonEmptyString" },
+              "description": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          }
+        },
+        "goals": { "$ref": "#/$defs/stringArray" },
+        "constraints": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/requirement" }
+    },
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entity" }
+    },
+    "workflows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workflow" }
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "data", "constraints"],
+      "properties": {
+        "mode": { "enum": ["NONE", "LOCAL", "EXTERNAL"] },
+        "data": { "$ref": "#/$defs/stringArray" },
+        "constraints": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "integrations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "mode", "description", "requirement_ids"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "kind": { "$ref": "#/$defs/nonEmptyString" },
+          "mode": { "enum": ["NONE", "STUB", "LOCAL", "EXTERNAL"] },
+          "description": { "$ref": "#/$defs/nonEmptyString" },
+          "requirement_ids": { "$ref": "#/$defs/idArray" }
+        }
+      }
+    },
+    "views": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "purpose", "states", "requirement_ids"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "$ref": "#/$defs/nonEmptyString" },
+          "purpose": { "$ref": "#/$defs/nonEmptyString" },
+          "states": { "$ref": "#/$defs/stringArray" },
+          "requirement_ids": { "$ref": "#/$defs/idArray" }
+        }
+      }
+    },
+    "acceptance_journeys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "actor_id", "steps", "expected_outcomes", "requirement_ids"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "title": { "$ref": "#/$defs/nonEmptyString" },
+          "actor_id": { "$ref": "#/$defs/id" },
+          "steps": { "$ref": "#/$defs/nonEmptyStringArray" },
+          "expected_outcomes": { "$ref": "#/$defs/nonEmptyStringArray" },
+          "requirement_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/id" }
+          }
+        }
+      }
+    },
+    "assumptions": { "$ref": "#/$defs/stringArray" },
+    "exclusions": { "$ref": "#/$defs/stringArray" },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description", "source_refs", "resolution"],
+        "properties": {
+          "description": { "$ref": "#/$defs/nonEmptyString" },
+          "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceReference" } },
+          "resolution": { "$ref": "#/$defs/nonEmptyString" }
+        }
+      }
+    },
+    "selected_patterns": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*@[0-9]+\\.[0-9]+\\.[0-9]+$" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "stringArray": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "nonEmptyStringArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+    "idArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "sourceFragment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "start", "end", "text"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^fragment-[a-f0-9]{12}-[1-9][0-9]*$" },
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 1 },
+        "text": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "sourceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fragment_id", "start", "end", "quote"],
+      "properties": {
+        "fragment_id": { "type": "string", "pattern": "^fragment-[a-f0-9]{12}-[1-9][0-9]*$" },
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 1 },
+        "quote": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "fragmentDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fragment_id", "classification", "requirement_ids", "note"],
+      "properties": {
+        "fragment_id": { "type": "string", "pattern": "^fragment-[a-f0-9]{12}-[1-9][0-9]*$" },
+        "classification": { "enum": ["USED", "CONTEXT", "CONSTRAINT", "AMBIGUOUS", "EXCLUDED"] },
+        "requirement_ids": { "$ref": "#/$defs/idArray" },
+        "note": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "description", "kind", "provenance", "disposition", "source_refs", "journey_ids"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "kind": { "enum": ["FUNCTIONAL", "PERSISTENCE", "ROBUSTNESS", "INTEGRATION", "SCOPE"] },
+        "provenance": { "enum": ["EXPLICIT", "IMPLIED", "DEFAULT", "PROPOSED", "EXCLUDED"] },
+        "disposition": { "enum": ["IMPLEMENT", "PROPOSE", "EXCLUDE"] },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceReference" } },
+        "journey_ids": { "$ref": "#/$defs/idArray" }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "fields", "relationships", "validation"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "type", "required", "values", "validation"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "$ref": "#/$defs/nonEmptyString" },
+              "type": { "enum": ["string", "number", "boolean", "date", "enum", "identifier"] },
+              "required": { "type": "boolean" },
+              "values": { "$ref": "#/$defs/stringArray" },
+              "validation": { "$ref": "#/$defs/stringArray" }
+            }
+          }
+        },
+        "relationships": { "$ref": "#/$defs/stringArray" },
+        "validation": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "entity_id", "initial_state", "states", "transitions", "invariants"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "entity_id": { "$ref": "#/$defs/id" },
+        "initial_state": { "$ref": "#/$defs/nonEmptyString" },
+        "states": { "$ref": "#/$defs/nonEmptyStringArray" },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "from", "to", "trigger", "guards", "effects"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "from": { "$ref": "#/$defs/nonEmptyString" },
+              "to": { "$ref": "#/$defs/nonEmptyString" },
+              "trigger": { "$ref": "#/$defs/nonEmptyString" },
+              "guards": { "$ref": "#/$defs/stringArray" },
+              "effects": { "$ref": "#/$defs/stringArray" }
+            }
+          }
+        },
+        "invariants": { "$ref": "#/$defs/stringArray" }
+      }
+    }
+  }
+}

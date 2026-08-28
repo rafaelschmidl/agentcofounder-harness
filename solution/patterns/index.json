@@ -1,0 +1,13 @@
+{
+  "version": "0.1",
+  "cards": [
+    "cards/crud.collection.json",
+    "cards/persistence.local.json",
+    "cards/workflow.state-machine.json",
+    "cards/transaction.atomic.json",
+    "cards/checkout.stubbed.json",
+    "cards/metrics.derived.json",
+    "cards/domain.commerce.json",
+    "cards/domain.saas-operations.json"
+  ]
+}

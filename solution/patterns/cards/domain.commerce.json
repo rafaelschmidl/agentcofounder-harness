@@ -1,0 +1,10 @@
+{
+  "id": "domain.commerce@1.0.0",
+  "title": "Small local commerce operations",
+  "summary": "Model products, stock, cart lines, customer identity, orders, totals, and bounded checkout behavior for a local MVP.",
+  "signals": ["shop", "product", "catalogue", "catalog", "price", "stock", "cart", "customer", "order", "commerce", "sell"],
+  "capabilities": ["product-catalogue", "stock-control", "cart-quantities", "customer-checkout", "order-history"],
+  "defaults": ["Use minor currency units", "Reject quantities above stock", "Keep cart lines keyed by product ID"],
+  "risks": ["Negative inventory", "Incorrect totals", "Orphaned cart references"],
+  "verification": ["Edit catalogue and stock", "Change and remove cart quantities", "Validate total and stock boundaries"]
+}

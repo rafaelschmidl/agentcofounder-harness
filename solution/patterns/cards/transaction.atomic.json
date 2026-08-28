@@ -1,0 +1,10 @@
+{
+  "id": "transaction.atomic@1.0.0",
+  "title": "Atomic local transaction",
+  "summary": "Validate a multi-record operation before committing all effects exactly once, leaving state unchanged on failure.",
+  "signals": ["transaction", "checkout", "order", "stock", "quantity", "success", "declined", "unchanged", "exactly once"],
+  "capabilities": ["precondition-validation", "atomic-effects", "idempotent-submit", "failure-rollback"],
+  "defaults": ["Calculate effects before mutation", "Commit one new state snapshot", "Disable duplicate submission while pending"],
+  "risks": ["Partial stock updates", "Duplicate orders", "Failure clearing valid state"],
+  "verification": ["Commit all success effects once", "Preserve all state on failure", "Repeat submission safely"]
+}
