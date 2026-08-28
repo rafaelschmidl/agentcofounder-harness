@@ -229,7 +229,7 @@ async function main(): Promise<void> {
   });
 
   await trace.record("customization", "started", "Started constrained product customization.");
-  const prompts = await loadBuilderPrompts(outputDirectory);
+  const prompts = await loadBuilderPrompts(outputDirectory, plan);
   const builderEvents = path.join(builderDirectory, "events.jsonl");
   const builderStderr = path.join(builderDirectory, "pi.stderr.log");
   const builderEnvironment = await createPiEnvironment(builderDirectory, {

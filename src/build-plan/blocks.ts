@@ -138,9 +138,37 @@ export function transact<State, Value>(
   current: State,
   prepare: (snapshot: State) => { next: State; value: Value } | { error: string },
 ): TransactionResult<State, Value> {
-  const prepared = prepare(current);
+  const prepared = prepare(structuredClone(current));
   if ("error" in prepared) return { ok: false, state: current, error: prepared.error };
   return { ok: true, state: prepared.next, value: prepared.value };
+}
+
+export interface TransactionEnvelope<State> {
+  state: State;
+  completedKeys: readonly string[];
+}
+
+export type IdempotentTransactionResult<State, Value> =
+  | { ok: true; envelope: TransactionEnvelope<State>; value: Value }
+  | { ok: false; envelope: TransactionEnvelope<State>; error: string };
+
+export function transactOnce<State, Value>(
+  current: TransactionEnvelope<State>,
+  idempotencyKey: string,
+  prepare: (snapshot: State) => { next: State; value: Value } | { error: string },
+): IdempotentTransactionResult<State, Value> {
+  const key = idempotencyKey.trim();
+  if (!key) return { ok: false, envelope: current, error: "An idempotency key is required." };
+  if (current.completedKeys.includes(key)) {
+    return { ok: false, envelope: current, error: "This transaction was already completed." };
+  }
+  const result = transact(current.state, prepare);
+  if (!result.ok) return { ok: false, envelope: current, error: result.error };
+  return {
+    ok: true,
+    envelope: { state: result.state, completedKeys: [...current.completedKeys, key] },
+    value: result.value,
+  };
 }
 `,
     },
@@ -154,21 +182,28 @@ function paymentFiles(): MaterializedFile[] {
       content: `export type PaymentMode = "succeed" | "decline";
 export type PaymentResult =
   | { ok: true; reference: string }
-  | { ok: false; code: "declined"; message: string };
+  | { ok: false; code: "declined" | "invalid"; message: string };
+
+export interface PaymentInput {
+  amountMinor: number;
+  mode: PaymentMode;
+  idempotencyKey: string;
+}
 
 export interface PaymentProvider {
-  charge(input: { amountMinor: number; mode: PaymentMode }): Promise<PaymentResult>;
+  charge(input: PaymentInput): Promise<PaymentResult>;
 }
 
 export class DeterministicPaymentStub implements PaymentProvider {
-  async charge(input: { amountMinor: number; mode: PaymentMode }): Promise<PaymentResult> {
-    if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor < 0) {
-      return { ok: false, code: "declined", message: "Invalid payment amount." };
+  async charge(input: PaymentInput): Promise<PaymentResult> {
+    const key = input.idempotencyKey.trim();
+    if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 || !key) {
+      return { ok: false, code: "invalid", message: "A positive amount and idempotency key are required." };
     }
     if (input.mode === "decline") {
       return { ok: false, code: "declined", message: "The simulated payment was declined." };
     }
-    return { ok: true, reference: \`stub-\${input.amountMinor}\` };
+    return { ok: true, reference: \`stub-\${key}\` };
   }
 }
 `,
@@ -300,9 +335,15 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
     dependencies: ["app.foundation"],
     conflicts: [],
     owned_files: ["src/system/transaction.ts"],
-    exported_interfaces: ["TransactionResult", "transact"],
+    exported_interfaces: [
+      "TransactionResult",
+      "TransactionEnvelope",
+      "IdempotentTransactionResult",
+      "transact",
+      "transactOnce",
+    ],
     materialize: transactionFiles,
-    checks: ["success commits once", "failure preserves state"],
+    checks: ["success commits once", "failure preserves state", "duplicate idempotency key is rejected"],
   },
   {
     id: "integration.payment-stub",
@@ -312,7 +353,7 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
     dependencies: ["domain.transaction"],
     conflicts: ["integration.real-payment"],
     owned_files: ["src/system/payment.ts"],
-    exported_interfaces: ["PaymentProvider", "PaymentMode", "PaymentResult", "DeterministicPaymentStub"],
+    exported_interfaces: ["PaymentProvider", "PaymentInput", "PaymentMode", "PaymentResult", "DeterministicPaymentStub"],
     materialize: paymentFiles,
     checks: ["stub success test", "stub decline test", "no payment network test"],
   },

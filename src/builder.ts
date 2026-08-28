@@ -49,10 +49,27 @@ export function buildBuilderPiArguments(
   ];
 }
 
-export async function loadBuilderPrompts(outputDirectory: string): Promise<{ systemPrompt: string; appContext: string }> {
-  const [systemPrompt, appContext] = await Promise.all([
+export async function loadBuilderPrompts(
+  outputDirectory: string,
+  plan: BuildPlan,
+): Promise<{ systemPrompt: string; appContext: string }> {
+  const interfacePaths = plan.file_ownership
+    .filter((entry) => entry.owner === "BLOCK" && entry.path.startsWith("src/system/"))
+    .map((entry) => entry.path)
+    .sort();
+  const [systemPrompt, appInstructions, interfaces] = await Promise.all([
     readFile(path.join(REPOSITORY_ROOT, "solution", "builder-prompt.md"), "utf8"),
     readFile(path.join(outputDirectory, "AGENTS.md"), "utf8"),
+    Promise.all(interfacePaths.map(async (relativePath) => ({
+      relativePath,
+      content: await readFile(path.join(outputDirectory, relativePath), "utf8"),
+    }))),
   ]);
-  return { systemPrompt, appContext };
+  const interfaceContext = interfaces
+    .map(({ relativePath, content }) => `### ${relativePath}\n\n\`\`\`tsx\n${content.trim()}\n\`\`\``)
+    .join("\n\n");
+  return {
+    systemPrompt,
+    appContext: `${appInstructions.trim()}\n\n## Materialized system interfaces\n\n${interfaceContext}`,
+  };
 }

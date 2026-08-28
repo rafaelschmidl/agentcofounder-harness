@@ -1,8 +1,9 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildBuilderPiArguments } from "../src/builder.js";
+import { buildBuilderPiArguments, loadBuilderPrompts } from "../src/builder.js";
 import { compileProductSpec } from "../src/build-plan/compile.js";
 import { contentHash } from "../src/build-plan/hash.js";
 import { linkBuildPlan, materializeBuildPlan } from "../src/build-plan/materialize.js";
@@ -149,5 +150,73 @@ describe("deterministic BuildPlan compiler", () => {
     expect(args.join(" ")).not.toContain("read,bash");
     expect(args.join(" ")).toContain("owned-paths.ts");
     expect(args.at(-1)).toContain("Validated ProductSpec");
+  });
+
+  it("supplies materialized system interfaces without spending builder read turns", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "builder-interface-context-"));
+    temporaryDirectories.push(directory);
+    const spec = commerceSpec();
+    const plan = compileProductSpec(spec);
+    await writeFile(path.join(directory, "AGENTS.md"), "# Generated app contract\n", "utf8");
+    await materializeBuildPlan(plan, spec, directory);
+
+    const prompts = await loadBuilderPrompts(directory, plan);
+
+    expect(prompts.appContext).toContain("## Materialized system interfaces");
+    expect(prompts.appContext).toContain("src/system/repository.ts");
+    expect(prompts.appContext).toContain("LocalStorageRepository");
+    expect(prompts.appContext).toContain("src/system/payment.ts");
+    expect(prompts.appContext).toContain("DeterministicPaymentStub");
+  });
+
+  it("materializes rollback-safe, idempotent commerce primitives", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "commerce-primitives-"));
+    temporaryDirectories.push(directory);
+    const spec = commerceSpec();
+    const plan = compileProductSpec(spec);
+    await materializeBuildPlan(plan, spec, directory);
+
+    const transaction = await import(pathToFileURL(path.join(directory, "src/system/transaction.ts")).href);
+    const payment = await import(pathToFileURL(path.join(directory, "src/system/payment.ts")).href);
+    const initial = { stock: 2, cart: ["book"] };
+    const failed = transaction.transact(initial, (snapshot: typeof initial) => {
+      snapshot.stock = 0;
+      snapshot.cart.push("tampered");
+      return { error: "declined" };
+    });
+
+    expect(failed).toEqual({ ok: false, state: initial, error: "declined" });
+    expect(initial).toEqual({ stock: 2, cart: ["book"] });
+
+    const envelope = { state: initial, completedKeys: [] as string[] };
+    const completed = transaction.transactOnce(envelope, "order-1", (snapshot: typeof initial) => ({
+      next: { ...snapshot, stock: snapshot.stock - 1, cart: [] },
+      value: "paid",
+    }));
+    expect(completed.ok).toBe(true);
+    expect(completed.envelope).toEqual({ state: { stock: 1, cart: [] }, completedKeys: ["order-1"] });
+    const duplicate = transaction.transactOnce(completed.envelope, "order-1", () => {
+      throw new Error("duplicate transaction must not run");
+    });
+    expect(duplicate).toEqual({
+      ok: false,
+      envelope: completed.envelope,
+      error: "This transaction was already completed.",
+    });
+
+    const provider = new payment.DeterministicPaymentStub();
+    await expect(provider.charge({ amountMinor: 1200, mode: "succeed", idempotencyKey: "order-1" })).resolves.toEqual({
+      ok: true,
+      reference: "stub-order-1",
+    });
+    await expect(provider.charge({ amountMinor: 1200, mode: "decline", idempotencyKey: "order-2" })).resolves.toEqual({
+      ok: false,
+      code: "declined",
+      message: "The simulated payment was declined.",
+    });
+    await expect(provider.charge({ amountMinor: 0, mode: "succeed", idempotencyKey: "" })).resolves.toMatchObject({
+      ok: false,
+      code: "invalid",
+    });
   });
 });
