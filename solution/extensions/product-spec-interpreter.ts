@@ -3,7 +3,7 @@ import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { appendPatternRetrievalAudit } from "../../src/patterns/audit.js";
 import { retrievePatterns } from "../../src/patterns/catalog.js";
-import { submitProductSpecCandidate } from "../../src/product-spec/submit.js";
+import { submitProductSpecDraftCandidate } from "../../src/product-spec/submit.js";
 import type { SourceFragment } from "../../src/product-spec/types.js";
 
 function requiredEnvironment(name: string): string {
@@ -46,13 +46,13 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
     defineTool({
       name: "submit_product_spec",
       label: "Submit ProductSpec",
-      description: "Validate and save the final ProductSpec JSON. Validation errors are returned so the same session can repair and resubmit.",
-      promptSnippet: "Submit the complete ProductSpec JSON for deterministic validation",
+      description: "Expand, validate, and save a compact ProductSpec draft. The runner injects hashes, immutable fragments, and exact source ranges. Validation errors are returned for bounded repair.",
+      promptSnippet: "Submit a compact semantic ProductSpec draft for deterministic expansion and validation",
       promptGuidelines: [
         "Use submit_product_spec as the final action. If it returns validation errors, repair only those errors and submit again in the same session.",
       ],
       parameters: Type.Object({
-        spec_json: Type.String({ minLength: 2, description: "The complete ProductSpec v0.1 encoded as JSON" }),
+        spec_json: Type.String({ minLength: 2, description: "Compact ProductSpec draft JSON using fragment ID arrays for source_refs" }),
       }),
       async execute(_toolCallId, params) {
         const [idea, fragmentsJson] = await Promise.all([
@@ -60,7 +60,7 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
           readFile(fragmentsFile, "utf8"),
         ]);
         const fragments = JSON.parse(fragmentsJson) as SourceFragment[];
-        const submission = await submitProductSpecCandidate(params.spec_json, idea, fragments, outputFile);
+        const submission = await submitProductSpecDraftCandidate(params.spec_json, idea, fragments, outputFile);
         if (!submission.accepted) {
           return {
             content: [

@@ -10,7 +10,7 @@ Your priorities are:
 4. Mark attractive but unnecessary additions as PROPOSED, never silently as implemented scope.
 5. Mark explicit negative scope as EXCLUDED and preserve it in exclusions.
 
-The runner supplies immutable source fragments with exact offsets. Copy them exactly into `source_fragments`. Every fragment needs exactly one `fragment_disposition`. EXPLICIT requirements need exact `source_refs`; their `quote` must equal the raw idea substring at `start:end` and remain inside the referenced fragment.
+The runner supplies immutable source fragments with exact offsets. Do not copy `source_idea_hash` or `source_fragments` into your draft: the deterministic submit tool injects them. Every fragment needs exactly one `fragment_disposition`. In your draft, each requirement or conflict `source_refs` is only an array of referenced fragment ID strings, such as `["fragment-abcd1234abcd-1"]`. The submit tool deterministically expands those IDs into exact full-fragment quotes and ranges. Never calculate offsets yourself.
 
 Use these provenance and disposition pairs:
 
@@ -22,9 +22,9 @@ Every IMPLEMENT requirement must map bidirectionally to at least one acceptance 
 
 Retrieve relevant bundled patterns before drafting. Only include versioned IDs actually returned by `retrieve_patterns` in `selected_patterns`. A pattern is supporting product knowledge, not permission to add unrelated scope.
 
-ProductSpec v0.1 contains:
+The compact draft contains every ProductSpec v0.1 field except `source_idea_hash` and `source_fragments`:
 
-- `version`, `source_idea_hash`, `source_fragments`, and `fragment_disposition`;
+- `version` and `fragment_disposition`;
 - `product` with summary, actors, goals, and constraints;
 - requirements with kind, provenance, disposition, source references, and journey IDs;
 - entities with typed fields, relationships, and validation;
@@ -34,4 +34,6 @@ ProductSpec v0.1 contains:
 - acceptance journeys with steps, outcomes, and requirement mappings;
 - assumptions, exclusions, resolved conflicts, and selected patterns.
 
-Use compact IDs such as `actor_owner`, `req_add_record`, and `journey_add_record`. Arrays may be empty only when the idea does not need that concept. Submit a complete JSON document with `submit_product_spec`; repair any returned errors in the same session.
+Use compact IDs such as `actor_owner`, `req_add_record`, and `journey_add_record`. Keep descriptions, steps, and outcomes terse but testable. Combine related behaviors into one requirement or journey when their provenance and acceptance path are the same. Arrays may be empty only when the idea does not need that concept.
+
+After pattern retrieval, immediately call `submit_product_spec` with compact JSON. Do not narrate, calculate offsets, repeat the source text, or emit hidden fields. Keep the complete tool call below 3,500 output tokens. Repair only returned validation errors in the same session.

@@ -83,10 +83,7 @@ export async function runProductSpecInterpretation(
     stderr: path.join(artifactDirectory, "interpreter.stderr.log"),
   };
   const fragments = segmentIdea(idea);
-  const [systemPrompt, productSpecSchema] = await Promise.all([
-    readFile(path.join(REPOSITORY_ROOT, "solution", "interpreter-prompt.md"), "utf8"),
-    readFile(path.join(REPOSITORY_ROOT, "src", "product-spec", "product-spec.schema.json"), "utf8"),
-  ]);
+  const systemPrompt = await readFile(path.join(REPOSITORY_ROOT, "solution", "interpreter-prompt.md"), "utf8");
   await mkdir(path.join(artifactDirectory, "sessions"), { recursive: true });
   await Promise.all([
     writeFile(files.idea, idea, { encoding: "utf8", flag: "wx" }),
@@ -104,7 +101,7 @@ export async function runProductSpecInterpretation(
     buildInterpreterPiArguments(
       idea,
       fragments,
-      `${systemPrompt.trim()}\n\n## Canonical ProductSpec JSON Schema\n\n${productSpecSchema.trim()}`,
+      systemPrompt,
       artifactDirectory,
     ),
     REPOSITORY_ROOT,

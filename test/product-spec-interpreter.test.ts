@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildInterpreterPiArguments } from "../src/product-spec/interpreter.js";
 import { segmentIdea } from "../src/product-spec/fragments.js";
-import { submitProductSpecCandidate } from "../src/product-spec/submit.js";
+import { submitProductSpecCandidate, submitProductSpecDraftCandidate } from "../src/product-spec/submit.js";
 import { SAMPLE_IDEA, validProductSpec } from "./fixtures/product-spec.js";
 
 const temporaryDirectories: string[] = [];
@@ -67,6 +67,35 @@ describe("ProductSpec interpreter boundary", () => {
     const spec = validProductSpec();
     const result = await submitProductSpecCandidate(
       JSON.stringify(spec),
+      SAMPLE_IDEA,
+      segmentIdea(SAMPLE_IDEA),
+      output,
+    );
+
+    expect(result.accepted).toBe(true);
+    expect(JSON.parse(await readFile(output, "utf8"))).toEqual(spec);
+  });
+
+  it("deterministically expands compact fragment references before validation", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "product-spec-draft-"));
+    temporaryDirectories.push(directory);
+    const output = path.join(directory, "idea_spec.json");
+    const spec = validProductSpec();
+    const { source_idea_hash: _hash, source_fragments: _fragments, ...semantic } = spec;
+    const draft = {
+      ...semantic,
+      requirements: spec.requirements.map((requirement) => ({
+        ...requirement,
+        source_refs: requirement.source_refs.map((reference) => reference.fragment_id),
+      })),
+      conflicts: spec.conflicts.map((conflict) => ({
+        ...conflict,
+        source_refs: conflict.source_refs.map((reference) => reference.fragment_id),
+      })),
+    };
+
+    const result = await submitProductSpecDraftCandidate(
+      JSON.stringify(draft),
       SAMPLE_IDEA,
       segmentIdea(SAMPLE_IDEA),
       output,
