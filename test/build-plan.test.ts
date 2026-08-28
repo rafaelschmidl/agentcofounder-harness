@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildBuilderPiArguments, loadBuilderPrompts } from "../src/builder.js";
+import { buildBuilderPiArguments, builderThinkingFromEnvironment, loadBuilderPrompts } from "../src/builder.js";
 import { compileProductSpec } from "../src/build-plan/compile.js";
 import { contentHash } from "../src/build-plan/hash.js";
 import { linkBuildPlan, materializeBuildPlan } from "../src/build-plan/materialize.js";
@@ -143,13 +143,23 @@ describe("deterministic BuildPlan compiler", () => {
   });
 
   it("configures the builder for owned writes without read, shell, or package-install access", () => {
+    const previousThinking = process.env.CHALLENGE_BUILDER_THINKING;
+    delete process.env.CHALLENGE_BUILDER_THINKING;
     const spec = validProductSpec();
     const plan = compileProductSpec(spec);
-    const args = buildBuilderPiArguments(spec, plan, "Builder prompt", "App context", "/tmp/run");
-    expect(args[args.indexOf("--tools") + 1]).toBe("write");
-    expect(args[args.indexOf("--tools") + 1]).not.toContain("bash");
-    expect(args.join(" ")).toContain("owned-paths.ts");
-    expect(args.at(-1)).toContain("Validated ProductSpec");
+    try {
+      const args = buildBuilderPiArguments(spec, plan, "Builder prompt", "App context", "/tmp/run");
+      expect(args[args.indexOf("--tools") + 1]).toBe("write");
+      expect(args[args.indexOf("--tools") + 1]).not.toContain("bash");
+      expect(args[args.indexOf("--thinking") + 1]).toBe("off");
+      expect(args.join(" ")).toContain("owned-paths.ts");
+      expect(args.at(-1)).toContain("Validated ProductSpec");
+      process.env.CHALLENGE_BUILDER_THINKING = "low";
+      expect(builderThinkingFromEnvironment()).toBe("low");
+    } finally {
+      if (previousThinking === undefined) delete process.env.CHALLENGE_BUILDER_THINKING;
+      else process.env.CHALLENGE_BUILDER_THINKING = previousThinking;
+    }
   });
 
   it("supplies materialized system interfaces without spending builder read turns", async () => {

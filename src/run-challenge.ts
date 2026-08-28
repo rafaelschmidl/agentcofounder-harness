@@ -63,6 +63,7 @@ Environment:
   CHALLENGE_PROVIDER      Optional Pi provider override
   CHALLENGE_MODEL         Optional Pi model override
   CHALLENGE_THINKING      Optional Pi thinking level (default: off)
+  CHALLENGE_BUILDER_THINKING Optional builder thinking level (default: off)
   CHALLENGE_TIMEOUT_MS    Wall-clock limit for Pi (default: 900000)
 `);
 }

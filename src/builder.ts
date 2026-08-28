@@ -7,6 +7,11 @@ import { providerFromEnvironment, providerPiArguments } from "./provider.js";
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
+export const DEFAULT_BUILDER_THINKING = "off";
+
+export function builderThinkingFromEnvironment(): string {
+  return process.env.CHALLENGE_BUILDER_THINKING ?? DEFAULT_BUILDER_THINKING;
+}
 
 export function buildBuilderPiArguments(
   spec: ProductSpec,
@@ -36,7 +41,7 @@ export function buildBuilderPiArguments(
     path.join(REPOSITORY_ROOT, "solution", "extensions", "owned-paths.ts"),
     ...providerPiArguments(provider.provider, provider.model),
     "--thinking",
-    provider.thinking,
+    builderThinkingFromEnvironment(),
     [
       "## Validated ProductSpec",
       JSON.stringify(spec, null, 2),
