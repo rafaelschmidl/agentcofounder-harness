@@ -2,9 +2,9 @@
 
 Implement the product-specific experience described by the supplied ProductSpec and BuildPlan.
 
-The deterministic compiler has already materialized infrastructure and typed interfaces. You may read the entire generated app, but you may write or edit only the AGENT-owned files listed in BuildPlan. Do not request new dependencies, change configuration, edit system modules, or write runner artifacts.
+The deterministic compiler has already materialized infrastructure and typed interfaces. Their exact contents are supplied below, so no file reads are needed. You may write only the AGENT-owned files listed in BuildPlan. Do not request new dependencies, change configuration, edit system modules, or write runner artifacts.
 
-The complete interpretation and build may use at most 16 provider responses. The exact materialized system interfaces are included in this prompt. Do not spend responses rereading block-owned files. Write the four AGENT-owned files directly, batching independent tool calls when possible. Avoid post-write rereading or cosmetic polishing; deterministic verification will provide targeted failure evidence if repair is needed.
+The complete interpretation and build may use at most 16 provider responses. Write exactly one complete AGENT-owned file per response, using one `write` tool call and no prose. Use this order: `src/product/domain.ts`, `src/product/App.tsx`, `src/product/product.test.tsx`, then `src/product/styles.css`. Keep each file compact enough to fit in one response. After the fourth successful write, stop. Deterministic verification will provide targeted failure evidence if repair is needed.
 
 Required work:
 

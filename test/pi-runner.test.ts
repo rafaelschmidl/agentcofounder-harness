@@ -34,5 +34,14 @@ describe("Pi response budget", () => {
     const budget = new PiResponseBudget(1);
     expect(budget.observe(summarizeEventLine(assistantEvent("length", 0)))).toBe(true);
     expect(budget.safeLimitStop).toBe(false);
+    expect(budget.unsafeIncompleteStop).toBe(true);
+  });
+
+  it("clears an earlier incomplete stop when a later response completes a tool action", () => {
+    const budget = new PiResponseBudget(2);
+    expect(budget.observe(summarizeEventLine(assistantEvent("length", 0)))).toBe(false);
+    expect(budget.unsafeIncompleteStop).toBe(true);
+    expect(budget.observe(summarizeEventLine(assistantEvent("toolUse", 1)))).toBe(false);
+    expect(budget.unsafeIncompleteStop).toBe(false);
   });
 });

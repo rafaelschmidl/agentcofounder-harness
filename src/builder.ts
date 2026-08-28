@@ -27,7 +27,7 @@ export function buildBuilderPiArguments(
     "--no-themes",
     "--no-context-files",
     "--tools",
-    "read,write,edit",
+    "write",
     "--system-prompt",
     `${systemPrompt.trim()}\n\n${appContext.trim()}`,
     "--session-dir",

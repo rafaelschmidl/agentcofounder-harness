@@ -60,6 +60,7 @@ export class PiResponseBudget {
   modelCalls = 0;
   callLimitReached = false;
   safeLimitStop = false;
+  unsafeIncompleteStop = false;
   private pendingToolsAtLimit = 0;
 
   constructor(maxModelCalls: number) {
@@ -70,6 +71,7 @@ export class PiResponseBudget {
   observe(summary: EventSummary): boolean {
     if (summary.assistantCall) {
       this.modelCalls += 1;
+      this.unsafeIncompleteStop = summary.stopReason === "length" && summary.toolCalls === 0;
       if (this.modelCalls >= this.maxModelCalls) {
         this.callLimitReached = true;
         this.pendingToolsAtLimit = summary.toolCalls;
@@ -144,7 +146,13 @@ export async function runPi(
         clearTimeout(timeout);
         if (killTimer) clearTimeout(killTimer);
         if (lineBuffer !== "") processEventLine(lineBuffer);
-        const exitCode = timedOut ? 124 : budget.callLimitReached && budget.safeLimitStop ? 0 : (code ?? 1);
+        const exitCode = timedOut
+          ? 124
+          : budget.unsafeIncompleteStop
+            ? 1
+            : budget.callLimitReached && budget.safeLimitStop
+              ? 0
+              : (code ?? 1);
         resolve({
           exitCode,
           timedOut,

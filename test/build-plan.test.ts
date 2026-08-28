@@ -142,12 +142,12 @@ describe("deterministic BuildPlan compiler", () => {
     expect(mayAgentWrite("/tmp/app", plan.file_ownership, "report.partial.json")).toBe(false);
   });
 
-  it("configures the builder without shell or package-install access", () => {
+  it("configures the builder for owned writes without read, shell, or package-install access", () => {
     const spec = validProductSpec();
     const plan = compileProductSpec(spec);
     const args = buildBuilderPiArguments(spec, plan, "Builder prompt", "App context", "/tmp/run");
-    expect(args[args.indexOf("--tools") + 1]).toBe("read,write,edit");
-    expect(args.join(" ")).not.toContain("read,bash");
+    expect(args[args.indexOf("--tools") + 1]).toBe("write");
+    expect(args[args.indexOf("--tools") + 1]).not.toContain("bash");
     expect(args.join(" ")).toContain("owned-paths.ts");
     expect(args.at(-1)).toContain("Validated ProductSpec");
   });
