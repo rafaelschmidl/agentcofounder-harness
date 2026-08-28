@@ -4,12 +4,12 @@ import { effectiveModel, providerPiArguments, resolveBergetExtension } from "../
 describe("provider seam", () => {
   it("loads the approved Berget extension and namespaces its model", () => {
     expect(resolveBergetExtension()).toMatch(/@bergetai\/pi-provider\/index\.ts$/u);
-    expect(effectiveModel("berget", "Qwen/Qwen3.8-27B-FP8")).toBe("berget/Qwen/Qwen3.8-27B-FP8");
-    expect(providerPiArguments("berget", "Qwen/Qwen3.8-27B-FP8")).toEqual([
+    expect(effectiveModel("berget", "zai-org/GLM-5.2")).toBe("berget/zai-org/GLM-5.2");
+    expect(providerPiArguments("berget", "zai-org/GLM-5.2")).toEqual([
       "--provider",
       "berget",
       "--model",
-      "berget/Qwen/Qwen3.8-27B-FP8",
+      "berget/zai-org/GLM-5.2",
       "--extension",
       resolveBergetExtension(),
     ]);

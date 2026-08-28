@@ -49,9 +49,9 @@ describe("ProductSpec interpreter boundary", () => {
       expect(args).toContain("--no-builtin-tools");
       expect(args[args.indexOf("--tools") + 1]).toBe("retrieve_patterns,submit_product_spec");
       expect(args[args.indexOf("--provider") + 1]).toBe("berget");
-      expect(args[args.indexOf("--model") + 1]).toBe("berget/Qwen/Qwen3.8-27B-FP8");
+      expect(args[args.indexOf("--model") + 1]).toBe("berget/zai-org/GLM-5.2");
       expect(args.join(" ")).toContain("@bergetai/pi-provider");
-      expect(args[args.indexOf("--thinking") + 1]).toBe("medium");
+      expect(args[args.indexOf("--thinking") + 1]).toBe("high");
       expect(args.join(" ")).not.toContain("protected-paths.ts");
     } finally {
       if (previous.provider === undefined) delete process.env.CHALLENGE_PROVIDER;

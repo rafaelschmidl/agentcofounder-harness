@@ -63,7 +63,7 @@ The model and deterministic system have different responsibilities:
 flowchart TD
     subgraph Inputs["1. Inputs and local knowledge"]
         IDEA["Startup idea<br/>authoritative product brief"]
-        RUNTIME["Runtime configuration<br/>Berget and Qwen target<br/>replaceable at the boundary"]
+        RUNTIME["Runtime configuration<br/>Berget and GLM-5.2 target<br/>replaceable at the boundary"]
         PATTERNS["Offline product-pattern library<br/>business and interaction archetypes"]
     end
 
@@ -423,10 +423,11 @@ The hidden evaluator remains outside the official-run repair loop.
 
 ## 13. Model and provider position
 
-- `ASSUMPTION` — the judges are likely to use a Qwen model through Berget as the provider. The current working model candidate is `Qwen/Qwen3.8-27B-FP8`.
-- `DECISION` — prompts, tool contracts, context use, and repair behavior may be measured and optimized for that Qwen model.
-- `CONSTRAINT` — provider, model, thinking level, endpoint, and credentials remain runtime configuration. Qwen and Berget must not be hard-coded into the submission contract or core product semantics.
-- `PENDING` — exact official provider, model identifier, checkpoint, thinking level, and runtime limits remain subject to organizer confirmation.
+- `CONFIRMED` — organizer Ali Leylani states that contest judgment is based on GLM-5.2 through Berget; Qwen 3.8 27B is run only for academic or comparative reporting.
+- `INFERENCE` — `zai-org/GLM-5.2` is the intended live Berget slug; it is present in the installed provider extension, but organizers have not separately published the exact slug.
+- `DECISION` — prompts, tool contracts, context use, and repair behavior may be measured and optimized for GLM-5.2 while retaining Qwen compatibility evidence.
+- `CONSTRAINT` — provider, model, thinking level, endpoint, and credentials remain runtime configuration. GLM-5.2 and Berget must not be hard-coded into the submission contract or core product semantics.
+- `PENDING` — exact official thinking level, runtime limits, and the weighting between readiness and efficiency remain subject to organizer confirmation.
 
 Optimizing for the expected judge model should happen at replaceable runtime and prompting seams, not by making the compiler architecture provider-specific.
 
@@ -444,7 +445,7 @@ The following positions are accepted for this draft:
 8. A deterministic link and finalize pass follows custom generation.
 9. Repair is structured, evidence-driven, layer-specific, and bounded.
 10. External hidden evaluation cannot provide repair feedback during official judging.
-11. Provider and model selection remain configurable even while the system is tuned for the expected Qwen-through-Berget environment.
+11. Provider and model selection remain configurable even while the system is tuned for the confirmed GLM-5.2-through-Berget judging model.
 
 ## 15. Open design questions
 

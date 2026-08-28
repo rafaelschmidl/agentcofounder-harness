@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { DEFAULT_MODEL } from "./provider.js";
+import { providerFromEnvironment } from "./provider.js";
 
 const PASSTHROUGH = [
   "PATH",
@@ -18,6 +18,7 @@ export async function createPiEnvironment(
   stageDirectory: string,
   extra: NodeJS.ProcessEnv = {},
 ): Promise<NodeJS.ProcessEnv> {
+  const { model } = providerFromEnvironment();
   const home = path.join(stageDirectory, "home");
   const piState = path.join(stageDirectory, "pi-state");
   const sessions = path.join(stageDirectory, "sessions");
@@ -39,7 +40,7 @@ export async function createPiEnvironment(
         providers: {
           berget: {
             modelOverrides: {
-              [DEFAULT_MODEL]: { maxTokens: 8192 },
+              [model]: { maxTokens: 8192 },
             },
           },
         },

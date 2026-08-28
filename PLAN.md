@@ -10,7 +10,7 @@ Build System v0 on the clean `system-v0` branches, evolving the official starter
 
 ### PoC — Book Lending
 
-- Run the raw Book Lending prompt through live Qwen interpretation, validated `ProductSpec`, deterministic `BuildPlan`, block materialization, Qwen product customization, deterministic linking, verification, and bounded repair.
+- Run the raw Book Lending prompt through live GLM-5.2 interpretation, validated `ProductSpec`, deterministic `BuildPlan`, block materialization, GLM-5.2 product customization, deterministic linking, verification, and bounded repair.
 - Produce a successful application from a committed harness SHA with valid results, telemetry, `idea_spec.json`, `build_plan.json`, and `trace.jsonl`.
 - Pass independent Book Lending browser journeys against a clean snapshot of that SHA.
 
@@ -22,7 +22,7 @@ The same final harness SHA must succeed from raw prompts for:
 2. Small commerce checkout with deterministic payment stub.
 3. SaaS feedback workflow with state transitions and dashboard counts.
 
-All three must pass independent browser journeys within EUR 5 of new Berget/Qwen spend. Reaching the budget before all three pass does not count as MVP completion.
+All three must pass independent browser journeys within EUR 5 of cumulative Berget provider spend. Reaching the budget before all three pass does not count as MVP completion.
 
 ## Implementation
 
@@ -36,14 +36,14 @@ Create evaluator-owned prompts, requirements, and journey identifiers before tun
 
 The manifests remain outside the harness and are never mounted into generation runs.
 
-### Build a thin deterministic spine, then use Qwen immediately
+### Build a thin deterministic spine, then use the contest model immediately
 
 - Segment the raw idea into stable source fragments with IDs and character offsets.
 - Define `ProductSpec v0.1` as JSON Schema plus matching TypeScript types, validated with Ajv.
 - Add an offline pattern index and cards for CRUD, local persistence, state workflows, transactions, checkout, derived metrics, commerce, and SaaS operations.
 - Run an interpreter role through Pi with coding tools disabled. It can retrieve local pattern cards and submit a candidate ProductSpec.
 - Return schema and coverage errors within the same bounded interpreter session.
-- Make the first live Berget/Qwen action a real Book Lending interpretation, not a qualification gate.
+- Make the first live Berget/GLM-5.2 action a real Book Lending interpretation, not a qualification gate.
 
 ### Compile ProductSpec into BuildPlan
 
@@ -66,8 +66,8 @@ Every block declares its ID, version, configuration schema, capabilities, depend
 - Materialize deterministic infrastructure and typed extension interfaces first.
 - Generate a file-ownership manifest distinguishing block-owned, agent-owned, and linker-owned files.
 - Run a builder role only after those interfaces exist.
-- Let Qwen own product-specific UI, language, visual composition, and exceptional domain logic within declared agent-owned paths.
-- Prevent Qwen from editing block-owned or linker-owned files.
+- Let the configured model own product-specific UI, language, visual composition, and exceptional domain logic within declared agent-owned paths.
+- Prevent the model from editing block-owned or linker-owned files.
 - Deterministically generate final exports, routes, manifests, entry points, dependencies, and verification wiring.
 - Preserve React 19, Vite, and the committed application lockfile; generated apps may not install packages.
 
@@ -98,8 +98,9 @@ Allow at most five diagnosed repair cycles per idea. Every retry must include a 
 Working development configuration:
 
 - Provider: `berget`
-- Model: `Qwen/Qwen3.8-27B-FP8`
-- Thinking: `medium`
+- Model: `zai-org/GLM-5.2` (confirmed model family; slug verified in the installed Berget extension)
+- Interpreter thinking: `high`
+- Builder and repair thinking: `off`
 - Maximum 32 provider responses per app run
 - Maximum 8,192 output tokens per response
 - Maximum five repair cycles
@@ -190,7 +191,7 @@ npm run evaluate -- --harness <repo> --ref <ref> --fixture <fixture-id> --eviden
 
 ### Published readiness simulation
 
-System v0 does not use LLM-as-judge. It reproduces the published 100-point categories through explicit checks:
+System v0 does not use LLM-as-judge. It reproduces the published readiness categories through explicit checks:
 
 - **Usability and UX — 30:** task completion, accessible names and keyboard operation, validation/error feedback, responsive layout, empty states, and clean browser console.
 - **Persistence — 20:** reload survival, correct mutation persistence, and malformed-data recovery.
@@ -200,13 +201,13 @@ System v0 does not use LLM-as-judge. It reproduces the published 100-point categ
 
 Points use named binary subchecks with attached evidence. Each MVP app must pass every qualification journey, score at least 85/100, and receive points in every category.
 
-Calculate the published efficiency formula:
+Calculate and retain the website's currently published efficiency formula:
 
 ```text
 input tokens + output tokens x 3 + cache-read tokens x 0.1
 ```
 
-Report cache-write tokens separately until official weighting is clarified. Retain screenshots and evidence for human review. Add a model judge only if organizers confirm LLM-as-judge or later calibration demonstrates value.
+Also retain Pi-reported monetary cost. Organizer Slack now says Pi cost is accepted and that the readiness/efficiency weighting is undecided, while the website still says qualifying entries rank strictly by weighted tokens. Treat this as unresolved official-source conflict: report both independently and do not invent a combined score. Report cache-write tokens separately because neither source currently supplies a weight. Participant-observed GLM cache reads are useful experimental evidence, not an organizer guarantee. Retain screenshots and evidence for human review. Add a model judge only if organizers confirm LLM-as-judge or later calibration demonstrates value.
 
 ## Git, Linear, and Goal workflow
 
@@ -236,15 +237,21 @@ Link them sequentially. Only current work becomes In Progress. Return unfinished
 
 After `PLAN.md` and Linear setup are complete, start one Goal with this objective:
 
-> Implement the approved System v0 `PLAN.md` across the clean harness and evaluator `system-v0` branches. Produce a verified Book Lending PoC, then a verified MVP where one final harness SHA runs Book Lending, commerce checkout, and SaaS workflow from raw prompts through Berget/Qwen and the shared compiler. Require all independent browser journeys to pass, each app to reach the internal 85/100 readiness target, and new recorded model cost to remain within EUR 5. Preserve official contracts, retain evidence, allow at most five diagnosed repairs per idea, do not import legacy architecture, and do not modify main or push without the required approval.
+> Implement the approved System v0 `PLAN.md` across the clean harness and evaluator `system-v0` branches. Produce a verified Book Lending PoC, then a verified MVP where one final harness SHA runs Book Lending, commerce checkout, and SaaS workflow from raw prompts through Berget/GLM-5.2 and the shared compiler. Require all independent browser journeys to pass, each app to reach the internal 85/100 readiness target, and cumulative recorded provider cost to remain within EUR 5. Preserve official contracts, retain evidence, allow at most five diagnosed repairs per idea, do not import legacy architecture, and do not modify main or push without the required approval.
 
 ## Locked decisions
 
 - Harness starts at `1fc709b`; evaluator starts at `0f6caca`; the harness remains aligned with official starter revision `1363299`.
 - The official starter remains authoritative for runtime and result compatibility.
 - The published challenge specification motivates `idea_spec.json`, `trace.jsonl`, autonomous review and repair, readiness scoring, and weighted-token measurement.
+- `CONFIRMED` by organizers: contest judgment is based on Berget's GLM-5.2; Qwen 3.8 27B is comparative only.
+- `CONFIRMED` by organizers: the website Book Lending prompt is final, and the hidden prompt is different but similar in structure, difficulty, application kind, and scale.
+- `CONFIRMED` by organizers: Pi-reported runtime cost may be used; organizers will reconcile provider discrepancies.
+- `CONFLICT`: the website still says qualifying entries rank strictly by weighted tokens, while newer organizer statements say the readiness/efficiency balance is not finalized.
+- `DECISION`: retain weighted tokens, cache-write tokens, Pi cost, and readiness separately; the 85/100 threshold remains an internal gate, not an official cutoff.
+- `INFERENCE`: `zai-org/GLM-5.2` is the intended live slug because it appears in participant evidence and the installed Berget extension; exact official thinking/runtime settings remain pending.
 - No confirmed official evidence establishes LLM-as-judge.
 - General internet access is unavailable during generation; product knowledge is bundled locally.
-- Berget/Qwen calls within the EUR 5 limit are approved without another provider-stage pause.
+- Berget/GLM-5.2 and comparative Qwen calls within the cumulative EUR 5 limit are approved without another provider-stage pause.
 - Three live applications are required for MVP completion.
 - Linear projects remain In Progress; no new project, cycle, milestone, or label structure is introduced.

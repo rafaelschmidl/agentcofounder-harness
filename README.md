@@ -36,12 +36,13 @@ Provider-specific credentials are read by Pi. The optional challenge variables s
 ```bash
 export CHALLENGE_PROVIDER="provider-name"
 export CHALLENGE_MODEL="model-id"
-export CHALLENGE_THINKING="off"
+export CHALLENGE_THINKING="high"
+export CHALLENGE_BUILDER_THINKING="off"
 ```
 
 Never commit credentials. `.env.example` documents variable names, but the runner intentionally does not load `.env` files.
 
-The default thinking level is `off` to avoid multiplying output-token cost in the efficiency ranking. Raise it only when measurements show the extra reasoning improves completion quality.
+The current development defaults target Berget `zai-org/GLM-5.2`: `high` thinking for semantic interpretation and `off` for code generation and diagnosed repair. All values remain configurable. The evaluator retains both Pi-reported cost and the website's weighted-token metric because organizers have not reconciled their newer cost guidance with the published ranking text.
 
 The strict Node engine is intentional. `npm ci` fails on Node 23+ (including Node 26); use `.nvmrc` or the provided container rather than regenerating the lockfile with a newer runtime.
 

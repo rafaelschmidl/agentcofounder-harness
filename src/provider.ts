@@ -4,8 +4,8 @@ import path from "node:path";
 const require = createRequire(import.meta.url);
 
 export const DEFAULT_PROVIDER = "berget";
-export const DEFAULT_MODEL = "Qwen/Qwen3.8-27B-FP8";
-export const DEFAULT_THINKING = "medium";
+export const DEFAULT_MODEL = "zai-org/GLM-5.2";
+export const DEFAULT_THINKING = "high";
 
 export function resolveBergetExtension(): string {
   return path.join(path.dirname(require.resolve("@bergetai/pi-provider/package.json")), "index.ts");
