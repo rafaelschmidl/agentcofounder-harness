@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const MAX_REPAIR_CYCLES = 2;
+export const MAX_REPAIR_CYCLES = 5;
 const MAX_LOG_CHARACTERS = 12_000;
 const ANSI_ESCAPE = /\u001b\[[0-9;]*m/gu;
 

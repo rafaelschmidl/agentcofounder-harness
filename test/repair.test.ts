@@ -30,7 +30,7 @@ describe("diagnosed repair", () => {
 
     const first = await collectRepairDiagnosis(verification, output);
     const repeated = await collectRepairDiagnosis(verification, output);
-    expect(MAX_REPAIR_CYCLES).toBe(2);
+    expect(MAX_REPAIR_CYCLES).toBe(5);
     expect(first).toEqual(repeated);
     expect(first.evidence).toContain("<generated-app>/src/product/App.tsx failed");
     expect(first.evidence).toContain("uses a unique priority label");
