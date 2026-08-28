@@ -8,9 +8,21 @@ const ANSI_ESCAPE = /\u001b\[[0-9;]*m/gu;
 
 export interface RepairDiagnosis {
   key: string;
+  sourceFingerprint: string;
   evidence: string;
   stage: "build" | "tests" | "startup" | "unknown";
   permittedPaths: string[];
+}
+
+async function fingerprintSources(outputDirectory: string, permittedPaths: readonly string[]): Promise<string> {
+  const sources = await Promise.all(permittedPaths.map(async (relativePath) => {
+    try {
+      return `${relativePath}\0${await readFile(path.join(outputDirectory, relativePath), "utf8")}`;
+    } catch {
+      return `${relativePath}\0(unavailable)`;
+    }
+  }));
+  return createHash("sha256").update(sources.join("\0\0")).digest("hex");
 }
 
 const AGENT_PATH_PATTERN = /\b(src\/product\/(?:App\.tsx|domain\.ts|product\.test\.tsx|styles\.css))(?=[():\s]|$)/gu;
@@ -116,8 +128,10 @@ export async function collectRepairDiagnosis(
     .filter((line) => /(?:\bFAIL\b|\berror TS\d+\b|AssertionError|TestingLibraryElementError|\bError:|\s×\s)/u.test(line))
     .map((line) => line.replace(/:\d+(?::\d+)?/gu, ":<line>").trim())
     .join("\n");
+  const sourceFingerprint = await fingerprintSources(outputDirectory, permittedPaths);
   return {
-    key: createHash("sha256").update(signature || evidence).digest("hex"),
+    key: createHash("sha256").update(`${signature || evidence}\nsource:${sourceFingerprint}`).digest("hex"),
+    sourceFingerprint,
     evidence,
     stage,
     permittedPaths,

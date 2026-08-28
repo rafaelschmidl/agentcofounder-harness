@@ -17,6 +17,8 @@ describe("diagnosed repair", () => {
     const verification = path.join(directory, "verification");
     const output = path.join(directory, "app");
     await mkdir(verification);
+    await mkdir(path.join(output, "src/product"), { recursive: true });
+    await writeFile(path.join(output, "src/product/App.tsx"), "export default function App() { return null; }\n", "utf8");
     await writeFile(path.join(verification, "app-test.log"), `${output}/src/product/App.tsx failed\n`, "utf8");
     await writeFile(path.join(verification, "app-test-results.json"), JSON.stringify({
       testResults: [{ assertionResults: [{
@@ -38,6 +40,12 @@ describe("diagnosed repair", () => {
     expect(first.stage).toBe("tests");
     expect(first.permittedPaths).toEqual(["src/product/App.tsx"]);
     expect(first.key).toMatch(/^[a-f0-9]{64}$/u);
+    expect(first.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+
+    await writeFile(path.join(output, "src/product/App.tsx"), "export default function App() { return <main />; }\n", "utf8");
+    const afterSourceChange = await collectRepairDiagnosis(verification, output);
+    expect(afterSourceChange.sourceFingerprint).not.toBe(first.sourceFingerprint);
+    expect(afterSourceChange.key).not.toBe(first.key);
   });
 
   it("prioritizes compiler errors and permits only their responsible product files", async () => {

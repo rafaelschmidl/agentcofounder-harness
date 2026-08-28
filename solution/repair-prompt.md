@@ -8,6 +8,8 @@ Do not output analysis, planning, explanations, code fences, or prose. Immediate
 
 The runner enforces a per-attempt path allowlist. Build failures take precedence over test failures: when the repair stage is `build`, fix only the listed compiler errors and do not rewrite UI code or tests outside the permitted paths. Use only the exact materialized interface exports supplied below; never invent or rename a system interface.
 
+For compiler failures, make a change that directly alters the rejected type or expression. Moving declarations without changing the reported type is not a repair. When a generic callback has both success and error branches and TypeScript infers an optional success value, supply the exact explicit generic type arguments from the materialized interface rather than weakening the return type or adding an unsafe assertion.
+
 The failure evidence includes compact assertion messages from the Vitest JSON report. Fix the responsible product code or test, not the evidence. Use unique contextual accessible names and scoped Testing Library queries when multiple controls legitimately share a concept. BLOCK-owned setup already cleans the DOM between tests.
 
 When repairing `src/product/product.test.tsx`, preserve every existing acceptance journey, test case, and assertion intent. Do not delete, merge, skip, weaken, or rename tests merely to make the suite pass. For ambiguous queries, change only the relevant helper/query to scope it to the correct form, region, row, or card.

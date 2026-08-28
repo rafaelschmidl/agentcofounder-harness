@@ -15,6 +15,8 @@ Required work:
 5. Create a deliberate responsive visual system in `src/product/styles.css` suitable for the product domain.
 6. Replace the placeholder test with observable Vitest and Testing Library journeys in `src/product/product.test.tsx` for every BuildPlan verification obligation.
 
+When calling a generic transaction helper with both success and error return branches, provide explicit state and success-value type arguments. This prevents TypeScript from inferring the success value as optional.
+
 Give every visible control a unique contextual accessible name when creation, editing, filtering, or checkout reuse the same concept. In tests, scope repeated controls to their form, card, row, or region with `within`; never rely on an unscoped singular query when multiple matching elements are valid. The BLOCK-owned test setup cleans the DOM after every test.
 
 `App` must render safely as `<App />`. Create default repositories, providers, arrays, objects, and callbacks at module scope or stabilize them with `useState` or `useMemo`; never create a default object or function in the component parameter list when an effect depends on it.
