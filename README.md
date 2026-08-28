@@ -42,7 +42,7 @@ export CHALLENGE_BUILDER_THINKING="off"
 
 Never commit credentials. `.env.example` documents variable names, but the runner intentionally does not load `.env` files.
 
-The current development defaults target Berget `zai-org/GLM-5.2` with `low` thinking for compact structured interpretation and `high` thinking for code generation and diagnosed repair. All values remain configurable through `CHALLENGE_THINKING`, `CHALLENGE_INTERPRETER_THINKING`, and `CHALLENGE_BUILDER_THINKING`. The evaluator retains both Pi-reported cost and the website's weighted-token metric because organizers have not reconciled their newer cost guidance with the published ranking text.
+The current development defaults target Berget `zai-org/GLM-5.2` with `low` thinking for direct structured submission, code generation, and diagnosed repair. All values remain configurable through `CHALLENGE_THINKING`, `CHALLENGE_INTERPRETER_THINKING`, and `CHALLENGE_BUILDER_THINKING`. The evaluator retains both Pi-reported cost and the website's weighted-token metric because organizers have not reconciled their newer cost guidance with the published ranking text.
 
 The strict Node engine is intentional. `npm ci` fails on Node 23+ (including Node 26); use `.nvmrc` or the provided container rather than regenerating the lockfile with a newer runtime.
 

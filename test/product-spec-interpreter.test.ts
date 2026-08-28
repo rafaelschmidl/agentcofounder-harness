@@ -19,13 +19,14 @@ describe("ProductSpec interpreter boundary", () => {
     const schema = productSpecDraftSchema() as {
       required: string[];
       properties: Record<string, unknown>;
-      $defs: { sourceReference: Record<string, unknown> };
+      $defs: { sourceReference: Record<string, unknown>; fragmentDisposition: { required: string[] } };
     };
     expect(schema.required).not.toContain("source_idea_hash");
     expect(schema.required).not.toContain("source_fragments");
     expect(schema.properties).not.toHaveProperty("source_idea_hash");
     expect(schema.properties).not.toHaveProperty("source_fragments");
     expect(schema.$defs.sourceReference.type).toBe("string");
+    expect(schema.$defs.fragmentDisposition.required).not.toContain("requirement_ids");
   });
 
   it("enables only offline retrieval and submission tools", () => {
@@ -102,6 +103,7 @@ describe("ProductSpec interpreter boundary", () => {
     const { source_idea_hash: _hash, source_fragments: _fragments, ...semantic } = spec;
     const draft = {
       ...semantic,
+      fragment_disposition: spec.fragment_disposition.map(({ requirement_ids: _requirementIds, ...disposition }) => disposition),
       requirements: spec.requirements.map((requirement) => ({
         ...requirement,
         source_refs: requirement.source_refs.map((reference) => reference.fragment_id),
@@ -121,5 +123,46 @@ describe("ProductSpec interpreter boundary", () => {
 
     expect(result.accepted).toBe(true);
     expect(JSON.parse(await readFile(output, "utf8"))).toEqual(spec);
+  });
+
+  it("normalizes explicit negative scope and derives fragment mappings", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "product-spec-negative-scope-"));
+    temporaryDirectories.push(directory);
+    const output = path.join(directory, "idea_spec.json");
+    const spec = validProductSpec();
+    const { source_idea_hash: _hash, source_fragments: _fragments, ...semantic } = spec;
+    const reference = spec.requirements[0]!.source_refs[0]!.fragment_id;
+    const draft = {
+      ...semantic,
+      fragment_disposition: spec.fragment_disposition.map(({ requirement_ids: _ids, ...disposition }) => disposition),
+      requirements: [
+        ...spec.requirements.map((requirement) => ({
+          ...requirement,
+          source_refs: requirement.source_refs.map((item) => item.fragment_id),
+        })),
+        {
+          id: "req_no_login",
+          title: "No login",
+          description: "Authentication is outside this local MVP.",
+          kind: "SCOPE",
+          provenance: "EXPLICIT",
+          disposition: "EXCLUDE",
+          source_refs: [reference],
+          journey_ids: [],
+        },
+      ],
+      conflicts: spec.conflicts.map((conflict) => ({
+        ...conflict,
+        source_refs: conflict.source_refs.map((item) => item.fragment_id),
+      })),
+    };
+
+    const result = await submitProductSpecDraftCandidate(JSON.stringify(draft), SAMPLE_IDEA, segmentIdea(SAMPLE_IDEA), output);
+    expect(result.accepted).toBe(true);
+    const saved = JSON.parse(await readFile(output, "utf8"));
+    expect(saved.requirements.find((requirement: { id: string }) => requirement.id === "req_no_login").provenance)
+      .toBe("EXCLUDED");
+    expect(saved.fragment_disposition.find((disposition: { fragment_id: string }) => disposition.fragment_id === reference)
+      .requirement_ids).toContain("req_no_login");
   });
 });

@@ -60,6 +60,9 @@ export function expandProductSpecDraft(
         }
         return {
           ...requirement,
+          provenance: requirement.disposition === "EXCLUDE" && requirement.provenance === "EXPLICIT"
+            ? "EXCLUDED"
+            : requirement.provenance,
           source_refs: expandReferences(
             requirement.source_refs,
             fragments,
@@ -88,11 +91,35 @@ export function expandProductSpecDraft(
       })
     : draft.conflicts;
 
+  const requirementIdsByFragment = new Map<string, string[]>();
+  if (Array.isArray(requirements)) {
+    for (const requirement of requirements) {
+      if (!isObject(requirement) || typeof requirement.id !== "string" || !Array.isArray(requirement.source_refs)) continue;
+      for (const reference of requirement.source_refs) {
+        if (!isObject(reference) || typeof reference.fragment_id !== "string") continue;
+        const ids = requirementIdsByFragment.get(reference.fragment_id) ?? [];
+        if (!ids.includes(requirement.id)) ids.push(requirement.id);
+        requirementIdsByFragment.set(reference.fragment_id, ids);
+      }
+    }
+  }
+  const fragmentDisposition = Array.isArray(draft.fragment_disposition)
+    ? draft.fragment_disposition.map((disposition) => isObject(disposition)
+      ? {
+          ...disposition,
+          requirement_ids: typeof disposition.fragment_id === "string"
+            ? (requirementIdsByFragment.get(disposition.fragment_id) ?? []).sort()
+            : [],
+        }
+      : disposition)
+    : draft.fragment_disposition;
+
   if (errors.length > 0) return { errors };
   const candidate: ProductSpec = {
     ...(draft as unknown as ProductSpec),
     source_idea_hash: hashIdea(idea),
     source_fragments: sourceFragments,
+    fragment_disposition: fragmentDisposition as ProductSpec["fragment_disposition"],
     requirements: requirements as ProductSpec["requirements"],
     conflicts: conflicts as ProductSpec["conflicts"],
   };

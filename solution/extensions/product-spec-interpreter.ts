@@ -32,6 +32,10 @@ export function productSpecDraftSchema(): Record<string, unknown> {
     pattern: "^fragment-[a-f0-9]{12}-[1-9][0-9]*$",
     description: "Runner-provided source fragment ID; exact quote and offsets are injected deterministically",
   };
+  const disposition = schema.$defs.fragmentDisposition as { required?: string[] } | undefined;
+  if (disposition?.required) {
+    disposition.required = disposition.required.filter((field) => field !== "requirement_ids");
+  }
   delete schema.$schema;
   delete schema.$id;
   schema.title = "Compact ProductSpec semantic draft";

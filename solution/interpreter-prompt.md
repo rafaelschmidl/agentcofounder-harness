@@ -10,13 +10,15 @@ Your priorities are:
 4. Mark attractive but unnecessary additions as PROPOSED, never silently as implemented scope.
 5. Mark explicit negative scope as EXCLUDED and preserve it in exclusions.
 
-The runner supplies immutable source fragments with exact offsets. Do not copy `source_idea_hash` or `source_fragments` into your draft: the deterministic submit tool injects them. Every fragment needs exactly one `fragment_disposition`. In your draft, each requirement or conflict `source_refs` is only an array of referenced fragment ID strings, such as `["fragment-abcd1234abcd-1"]`. The submit tool deterministically expands those IDs into exact full-fragment quotes and ranges. Never calculate offsets yourself.
+The runner supplies immutable source fragments with exact offsets. Do not copy `source_idea_hash` or `source_fragments` into your draft: the deterministic submit tool injects them. Every fragment needs exactly one `fragment_disposition`, but omit its redundant `requirement_ids`; the runner derives them from requirement source references. In your draft, each requirement or conflict `source_refs` is only an array of referenced fragment ID strings, such as `["fragment-abcd1234abcd-1"]`. The submit tool deterministically expands those IDs into exact full-fragment quotes and ranges. Never calculate offsets yourself.
 
 Use these provenance and disposition pairs:
 
 - EXPLICIT, IMPLIED, or DEFAULT -> IMPLEMENT
 - PROPOSED -> PROPOSE
 - EXCLUDED -> EXCLUDE
+
+An explicit negative such as "no login" uses EXCLUDED provenance and EXCLUDE disposition; do not label it EXPLICIT.
 
 Every IMPLEMENT requirement must map bidirectionally to at least one acceptance journey. PROPOSE and EXCLUDE requirements must not map to journeys. DEFAULT requirements must not claim source references.
 

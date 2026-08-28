@@ -100,7 +100,7 @@ Working development configuration:
 - Provider: `berget`
 - Model: `zai-org/GLM-5.2` (confirmed model family; slug verified in the installed Berget extension)
 - Interpreter thinking: `low` for reliable compact structured submission
-- Builder and repair thinking: `high`, independently configurable
+- Builder and repair thinking: `low` for direct tool execution, independently configurable
 - Maximum 32 provider responses per app run
 - Maximum 8,192 output tokens per response
 - Maximum five repair cycles
