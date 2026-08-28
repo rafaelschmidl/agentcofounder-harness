@@ -77,7 +77,7 @@ export function buildRepairPiArguments(
     .join("\n");
   return [
     "--mode", "json", "--print", "--offline", "--no-extensions", "--no-skills",
-    "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", "write",
+    "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", "write,edit",
     "--system-prompt", `${systemPrompt.trim()}\n\n${appContext.trim()}`,
     "--session-dir", path.join(artifactDirectory, "sessions"),
     "--extension", path.join(REPOSITORY_ROOT, "solution", "extensions", "owned-paths.ts"),
