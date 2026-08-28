@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PiResponseBudget, summarizeEventLine } from "../src/pi-runner.js";
+import { PiResponseBudget, PiToolBudget, summarizeEventLine } from "../src/pi-runner.js";
 
 function assistantEvent(stopReason: string, toolCalls: number): string {
   return JSON.stringify({
@@ -15,6 +15,10 @@ function assistantEvent(stopReason: string, toolCalls: number): string {
       })),
     },
   });
+}
+
+function toolEnd(isError = false): string {
+  return JSON.stringify({ type: "tool_execution_end", toolName: "write", isError });
 }
 
 describe("Pi response budget", () => {
@@ -43,5 +47,15 @@ describe("Pi response budget", () => {
     expect(budget.unsafeIncompleteStop).toBe(true);
     expect(budget.observe(summarizeEventLine(assistantEvent("toolUse", 1)))).toBe(false);
     expect(budget.unsafeIncompleteStop).toBe(false);
+  });
+
+  it("stops after the configured number of successful tools and ignores failures", () => {
+    const budget = new PiToolBudget(2);
+    expect(budget.observe(summarizeEventLine(toolEnd(true)))).toBe(false);
+    expect(budget.successfulTools).toBe(0);
+    expect(budget.observe(summarizeEventLine(toolEnd()))).toBe(false);
+    expect(budget.observe(summarizeEventLine(toolEnd()))).toBe(true);
+    expect(budget.successfulTools).toBe(2);
+    expect(budget.limitReached).toBe(true);
   });
 });

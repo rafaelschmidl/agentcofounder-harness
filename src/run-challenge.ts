@@ -244,14 +244,19 @@ async function main(): Promise<void> {
     remainingTime(),
     builderEnvironment,
     Math.max(1, 16 - interpretation.command.modelCalls),
+    4,
   );
   if (builder.exitCode !== 0) {
     await trace.record("customization", "failed", "The constrained builder did not complete.", {
       exit_code: builder.exitCode,
       timed_out: builder.timedOut,
+      successful_owned_writes: builder.successfulToolCalls,
     });
   } else {
-    await trace.record("customization", "completed", "The constrained builder completed within AGENT-owned files.");
+    await trace.record("customization", "completed", "The constrained builder completed within AGENT-owned files.", {
+      successful_owned_writes: builder.successfulToolCalls,
+      stopped_after_owned_writes: builder.toolLimitReached,
+    });
   }
   await linkBuildPlan(plan, spec, outputDirectory);
   await trace.record("linking", "completed", "Deterministic routes, exports, and entry points were linked.");

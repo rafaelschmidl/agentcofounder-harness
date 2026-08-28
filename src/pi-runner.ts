@@ -12,6 +12,8 @@ export interface CommandResult {
   timedOut: boolean;
   modelCalls: number;
   callLimitReached: boolean;
+  successfulToolCalls: number;
+  toolLimitReached: boolean;
 }
 
 export interface EventSummary {
@@ -19,6 +21,7 @@ export interface EventSummary {
   stopReason: string;
   toolCalls: number;
   toolExecutionEnded: boolean;
+  toolExecutionSucceeded: boolean;
 }
 
 export function summarizeEventLine(line: string): EventSummary {
@@ -27,11 +30,13 @@ export function summarizeEventLine(line: string): EventSummary {
     stopReason: "",
     toolCalls: 0,
     toolExecutionEnded: false,
+    toolExecutionSucceeded: false,
   };
   try {
     const event = JSON.parse(line) as Record<string, unknown>;
     if (event.type === "tool_execution_end") {
       summary.toolExecutionEnded = true;
+      summary.toolExecutionSucceeded = event.isError !== true;
       console.log(`[pi] completed tool: ${String(event.toolName ?? "unknown")}`);
     }
     if (event.type === "message_end") {
@@ -53,6 +58,23 @@ export function summarizeEventLine(line: string): EventSummary {
     // The unmodified line remains in the raw JSONL evidence.
   }
   return summary;
+}
+
+export class PiToolBudget {
+  readonly maxSuccessfulTools: number;
+  successfulTools = 0;
+  limitReached = false;
+
+  constructor(maxSuccessfulTools = Number.POSITIVE_INFINITY) {
+    if (!(maxSuccessfulTools > 0)) throw new Error("maxSuccessfulTools must be greater than zero");
+    this.maxSuccessfulTools = maxSuccessfulTools;
+  }
+
+  observe(summary: EventSummary): boolean {
+    if (summary.toolExecutionEnded && summary.toolExecutionSucceeded) this.successfulTools += 1;
+    this.limitReached = this.successfulTools >= this.maxSuccessfulTools;
+    return this.limitReached;
+  }
 }
 
 export class PiResponseBudget {
@@ -92,8 +114,10 @@ export async function runPi(
   timeoutMs: number,
   environment: NodeJS.ProcessEnv = process.env,
   maxModelCalls = Number.POSITIVE_INFINITY,
+  maxSuccessfulTools = Number.POSITIVE_INFINITY,
 ): Promise<CommandResult> {
   const budget = new PiResponseBudget(maxModelCalls);
+  const toolBudget = new PiToolBudget(maxSuccessfulTools);
   const events = createWriteStream(eventFile, { flags: "wx" });
   const errors = createWriteStream(stderrFile, { flags: "wx" });
   let lineBuffer = "";
@@ -125,7 +149,7 @@ export async function runPi(
 
       const processEventLine = (line: string): void => {
         const summary = summarizeEventLine(line);
-        if (budget.observe(summary)) signalProcessTree(child, "SIGTERM");
+        if (budget.observe(summary) || toolBudget.observe(summary)) signalProcessTree(child, "SIGTERM");
       };
 
       child.stdout.on("data", (chunk: Buffer) => {
@@ -148,7 +172,9 @@ export async function runPi(
         if (lineBuffer !== "") processEventLine(lineBuffer);
         const exitCode = timedOut
           ? 124
-          : budget.unsafeIncompleteStop
+          : toolBudget.limitReached
+            ? 0
+            : budget.unsafeIncompleteStop
             ? 1
             : budget.callLimitReached && budget.safeLimitStop
               ? 0
@@ -158,6 +184,8 @@ export async function runPi(
           timedOut,
           modelCalls: budget.modelCalls,
           callLimitReached: budget.callLimitReached,
+          successfulToolCalls: toolBudget.successfulTools,
+          toolLimitReached: toolBudget.limitReached,
         });
       });
     });
