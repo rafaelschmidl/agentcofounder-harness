@@ -362,7 +362,7 @@ async function main(): Promise<void> {
         remainingTime(),
         repairEnvironment,
         remainingCalls,
-        Math.min(2, diagnosis.permittedPaths.length),
+        Math.max(1, Math.min(2, diagnosis.permittedPaths.length)),
       );
       stageEventFiles.push(repairEvents);
       customizationExitCode = repair.exitCode;

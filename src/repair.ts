@@ -71,11 +71,12 @@ export async function collectRepairDiagnosis(
   const buildLog = rawLogs.find((entry) => entry.label === "production build")?.content ?? "";
   const testLog = rawLogs.find((entry) => entry.label === "product tests")?.content ?? "";
   const startupLog = rawLogs.find((entry) => entry.label === "development startup")?.content ?? "";
-  const buildPaths = /error TS\d+/u.test(buildLog) ? agentPaths(buildLog) : [];
+  const hasBuildErrors = /error TS\d+/u.test(buildLog);
+  const buildPaths = hasBuildErrors ? agentPaths(buildLog) : [];
   const assertionPaths = agentPaths(testFailures);
   const testPaths = assertionPaths.length > 0 ? assertionPaths : agentPaths(testLog);
   const startupPaths = agentPaths(startupLog);
-  const stage = buildPaths.length > 0
+  const stage = hasBuildErrors
     ? "build"
     : testFailures !== "(no failed assertions in JSON report)" && testFailures !== "(test result JSON unavailable)"
       ? "tests"
@@ -83,11 +84,13 @@ export async function collectRepairDiagnosis(
         ? "startup"
         : "unknown";
   const permittedPaths = stage === "build"
-    ? buildPaths
+    ? (buildPaths.length > 0
+        ? buildPaths
+        : ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx"])
     : stage === "tests"
-      ? testPaths
+      ? (testPaths.length > 0 ? testPaths : ["src/product/product.test.tsx"])
       : stage === "startup"
-        ? startupPaths
+        ? (startupPaths.length > 0 ? startupPaths : ["src/product/App.tsx"])
         : ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx"];
   const relevantEvidence = stage === "build"
     ? `## Production build failures\n\n${buildLog}`

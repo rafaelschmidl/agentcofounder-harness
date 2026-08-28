@@ -70,4 +70,26 @@ describe("diagnosed repair", () => {
     expect(diagnosis.evidence).toContain("error TS4104");
     expect(diagnosis.evidence).not.toContain("ambiguous priority");
   });
+
+  it("targets the product test when an assertion excerpt has no source path", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "repair-pathless-test-"));
+    directories.push(directory);
+    const verification = path.join(directory, "verification");
+    const output = path.join(directory, "app");
+    await mkdir(verification);
+    await writeFile(path.join(verification, "app-test.log"), "tests failed\n", "utf8");
+    await writeFile(path.join(verification, "app-test-results.json"), JSON.stringify({
+      testResults: [{ assertionResults: [{
+        title: "ambiguous priority",
+        status: "failed",
+        failureMessages: ["TestingLibraryElementError: Found multiple elements with the text of: Priority"],
+      }] }],
+    }), "utf8");
+    await writeFile(path.join(verification, "app-build.log"), "build passed\n", "utf8");
+    await writeFile(path.join(verification, "app-dev.log"), "startup passed\n", "utf8");
+
+    const diagnosis = await collectRepairDiagnosis(verification, output);
+    expect(diagnosis.stage).toBe("tests");
+    expect(diagnosis.permittedPaths).toEqual(["src/product/product.test.tsx"]);
+  });
 });
