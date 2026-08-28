@@ -137,6 +137,8 @@ describe("deterministic BuildPlan compiler", () => {
     expect(await readFile(agentFile, "utf8")).toBe("export const preserved = true;\n");
     expect(await readFile(path.join(directory, "src/system/collection.ts"), "utf8")).toContain("upsertRecord");
     expect(await readFile(path.join(directory, "src/test/setup.ts"), "utf8")).toContain("afterEach(cleanup)");
+    expect(await readFile(path.join(directory, "src/system/app-smoke.test.tsx"), "utf8"))
+      .toContain("renders the default App without React runtime errors");
     expect(JSON.parse(await readFile(path.join(directory, "build_plan.json"), "utf8"))).toEqual(plan);
     expect(await readFile(path.join(directory, "src/App.tsx"), "utf8")).toContain("./product/App");
   });
@@ -160,7 +162,7 @@ describe("deterministic BuildPlan compiler", () => {
       const args = buildBuilderPiArguments(spec, plan, "Builder prompt", "App context", "/tmp/run");
       expect(args[args.indexOf("--tools") + 1]).toBe("write");
       expect(args[args.indexOf("--tools") + 1]).not.toContain("bash");
-      expect(args[args.indexOf("--thinking") + 1]).toBe("off");
+      expect(args[args.indexOf("--thinking") + 1]).toBe("high");
       expect(args.join(" ")).toContain("owned-paths.ts");
       expect(args.at(-1)).toContain("Validated ProductSpec");
       process.env.CHALLENGE_BUILDER_THINKING = "low";

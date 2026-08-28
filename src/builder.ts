@@ -13,7 +13,7 @@ const AGENT_PRODUCT_PATHS = [
   "src/product/product.test.tsx",
   "src/product/styles.css",
 ] as const;
-export const DEFAULT_BUILDER_THINKING = "off";
+export const DEFAULT_BUILDER_THINKING = "high";
 
 export function builderThinkingFromEnvironment(): string {
   return process.env.CHALLENGE_BUILDER_THINKING ?? DEFAULT_BUILDER_THINKING;

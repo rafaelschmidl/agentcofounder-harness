@@ -74,6 +74,8 @@ export async function collectRepairDiagnosis(
   const hasBuildErrors = /error TS\d+/u.test(buildLog);
   const buildPaths = hasBuildErrors ? agentPaths(buildLog) : [];
   const assertionPaths = agentPaths(testFailures);
+  const defaultAppSmokeFailed = /compiled application smoke contract|default App without React runtime errors|app-smoke\.test\.tsx/iu
+    .test(testFailures);
   const testPaths = assertionPaths.length > 0 ? assertionPaths : agentPaths(testLog);
   const startupPaths = agentPaths(startupLog);
   const stage = hasBuildErrors
@@ -88,7 +90,9 @@ export async function collectRepairDiagnosis(
         ? buildPaths
         : ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx"])
     : stage === "tests"
-      ? (testPaths.length > 0 ? testPaths : ["src/product/product.test.tsx"])
+      ? (defaultAppSmokeFailed
+          ? ["src/product/App.tsx"]
+          : testPaths.length > 0 ? testPaths : ["src/product/product.test.tsx"])
       : stage === "startup"
         ? (startupPaths.length > 0 ? startupPaths : ["src/product/App.tsx"])
         : ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx"];

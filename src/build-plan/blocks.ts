@@ -270,6 +270,28 @@ function verificationFiles(): MaterializedFile[] {
 } as const;
 `,
     },
+    {
+      path: "src/system/app-smoke.test.tsx",
+      content: `import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import App from "../product/App";
+
+describe("compiled application smoke contract", () => {
+  it("renders the default App without React runtime errors", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation((...arguments_) => {
+      const message = arguments_.map(String).join(" ");
+      if (/Maximum update depth|Invalid hook call|uncaught error/i.test(message)) throw new Error(message);
+    });
+    try {
+      render(<App />);
+      expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+});
+`,
+    },
   ];
 }
 
@@ -386,7 +408,7 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
     capabilities: ["journey-tests", "typecheck", "production-build"],
     dependencies: ["app.foundation"],
     conflicts: [],
-    owned_files: ["src/system/test-contract.ts"],
+    owned_files: ["src/system/test-contract.ts", "src/system/app-smoke.test.tsx"],
     exported_interfaces: ["PRODUCT_TEST_CONTRACT"],
     materialize: verificationFiles,
     checks: ["npm test", "npm run build"],

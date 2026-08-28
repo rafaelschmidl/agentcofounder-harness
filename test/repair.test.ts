@@ -92,4 +92,26 @@ describe("diagnosed repair", () => {
     expect(diagnosis.stage).toBe("tests");
     expect(diagnosis.permittedPaths).toEqual(["src/product/product.test.tsx"]);
   });
+
+  it("routes compiler-owned default-App smoke failures to product App code", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "repair-app-smoke-"));
+    directories.push(directory);
+    const verification = path.join(directory, "verification");
+    const output = path.join(directory, "app");
+    await mkdir(verification);
+    await writeFile(path.join(verification, "app-test.log"), "tests failed\n", "utf8");
+    await writeFile(path.join(verification, "app-test-results.json"), JSON.stringify({
+      testResults: [{ assertionResults: [{
+        title: "renders the default App without React runtime errors",
+        status: "failed",
+        failureMessages: ["Maximum update depth exceeded at src/system/app-smoke.test.tsx"],
+      }] }],
+    }), "utf8");
+    await writeFile(path.join(verification, "app-build.log"), "build passed\n", "utf8");
+    await writeFile(path.join(verification, "app-dev.log"), "startup passed\n", "utf8");
+
+    const diagnosis = await collectRepairDiagnosis(verification, output);
+    expect(diagnosis.stage).toBe("tests");
+    expect(diagnosis.permittedPaths).toEqual(["src/product/App.tsx"]);
+  });
 });
