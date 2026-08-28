@@ -336,7 +336,12 @@ async function main(): Promise<void> {
       const repairAttempt = attempt + 1;
       const repairDirectory = path.join(artifactDirectory, "repairs", `attempt-${repairAttempt}`);
       await mkdir(repairDirectory, { recursive: true });
-      const repairPrompts = await loadRepairPrompts(outputDirectory, plan, diagnosis.evidence);
+      const repairPrompts = await loadRepairPrompts(
+        outputDirectory,
+        plan,
+        diagnosis.evidence,
+        diagnosis.permittedPaths,
+      );
       const repairEvents = path.join(repairDirectory, "events.jsonl");
       const repairStderr = path.join(repairDirectory, "pi.stderr.log");
       const repairEnvironment = await createPiEnvironment(repairDirectory, {

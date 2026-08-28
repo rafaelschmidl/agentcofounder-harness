@@ -249,8 +249,14 @@ describe("deterministic BuildPlan compiler", () => {
     await writeFile(path.join(directory, "AGENTS.md"), "# Generated app contract\n", "utf8");
     await materializeBuildPlan(plan, spec, directory);
     await writeFile(path.join(directory, "src/product/domain.ts"), "export const broken = true;\n", "utf8");
+    await writeFile(path.join(directory, "src/product/App.tsx"), "export const unrelated = true;\n", "utf8");
 
-    const prompts = await loadRepairPrompts(directory, plan, "error TS9999 in src/product/domain.ts");
+    const prompts = await loadRepairPrompts(
+      directory,
+      plan,
+      "error TS9999 in src/product/domain.ts",
+      ["src/product/domain.ts"],
+    );
     const args = buildRepairPiArguments(
       spec,
       plan,
@@ -262,6 +268,7 @@ describe("deterministic BuildPlan compiler", () => {
     );
 
     expect(prompts.appContext).toContain("export const broken = true");
+    expect(prompts.appContext).not.toContain("export const unrelated = true");
     expect(prompts.appContext).toContain("error TS9999");
     expect(args[args.indexOf("--tools") + 1]).toBe("write,edit");
     expect(args.at(-1)).toContain("Repair attempt 1");

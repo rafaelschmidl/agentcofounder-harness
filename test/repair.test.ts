@@ -38,7 +38,7 @@ describe("diagnosed repair", () => {
     expect(first.evidence).toContain("uses a unique priority label");
     expect(first.evidence).toContain("Found multiple elements");
     expect(first.stage).toBe("tests");
-    expect(first.permittedPaths).toEqual(["src/product/App.tsx"]);
+    expect(first.permittedPaths).toEqual(["src/product/App.tsx", "src/product/product.test.tsx"]);
     expect(first.key).toMatch(/^[a-f0-9]{64}$/u);
     expect(first.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/u);
 
@@ -79,7 +79,7 @@ describe("diagnosed repair", () => {
     expect(diagnosis.evidence).not.toContain("ambiguous priority");
   });
 
-  it("targets the product test when an assertion excerpt has no source path", async () => {
+  it("allows both application and test repairs for Testing Library failures", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "repair-pathless-test-"));
     directories.push(directory);
     const verification = path.join(directory, "verification");
@@ -98,7 +98,28 @@ describe("diagnosed repair", () => {
 
     const diagnosis = await collectRepairDiagnosis(verification, output);
     expect(diagnosis.stage).toBe("tests");
-    expect(diagnosis.permittedPaths).toEqual(["src/product/product.test.tsx"]);
+    expect(diagnosis.permittedPaths).toEqual(["src/product/App.tsx", "src/product/product.test.tsx"]);
+  });
+
+  it("allows domain and test repairs for pathless value assertions", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "repair-domain-assertion-"));
+    directories.push(directory);
+    const verification = path.join(directory, "verification");
+    const output = path.join(directory, "app");
+    await mkdir(verification);
+    await writeFile(path.join(verification, "app-test.log"), "tests failed\n", "utf8");
+    await writeFile(path.join(verification, "app-test-results.json"), JSON.stringify({
+      testResults: [{ assertionResults: [{
+        title: "removes zero-quantity cart lines",
+        status: "failed",
+        failureMessages: ["AssertionError: expected 1 to be 0 at src/product/product.test.tsx:42:12"],
+      }] }],
+    }), "utf8");
+    await writeFile(path.join(verification, "app-build.log"), "build passed\n", "utf8");
+    await writeFile(path.join(verification, "app-dev.log"), "startup passed\n", "utf8");
+
+    const diagnosis = await collectRepairDiagnosis(verification, output);
+    expect(diagnosis.permittedPaths).toEqual(["src/product/domain.ts", "src/product/product.test.tsx"]);
   });
 
   it("routes compiler-owned default-App smoke failures to product App code", async () => {

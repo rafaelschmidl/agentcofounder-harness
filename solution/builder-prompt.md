@@ -21,6 +21,8 @@ Give every visible control a unique contextual accessible name when creation, ed
 
 `App` must render safely as `<App />`. Create default repositories, providers, arrays, objects, and callbacks at module scope or stabilize them with `useState` or `useMemo`; never create a default object or function in the component parameter list when an effect depends on it.
 
+The repository-backed state owned by `App` is canonical. Successful domain workflows must apply their complete resulting state to that owner so persistence observes the same products, records, counts, cart, and orders shown by the UI. Do not leave committed results only in child-component state, and do not dispatch a custom event unless an active parent listener applies its payload. Failed or declined workflows must leave canonical state unchanged.
+
 Keep `product.test.tsx` compact: at most one focused test per verification obligation plus any essential domain invariant, and below 6,500 characters. Prefer domain-function tests for rules and a small number of observable UI journeys. Never query `role="form"` unless the form has an explicit accessible name. Never use a broad singular `getByText` when the same wording can legitimately occur in an option, status, notice, or card. For validation, locate the relevant field or region and assert the corresponding alert's text content; do not query an alert by accessible name.
 
 Do not use external services, network calls, authentication, or package installation unless the ProductSpec explicitly requires them. Do not merely describe the implementation: finish by writing all four AGENT-owned files.

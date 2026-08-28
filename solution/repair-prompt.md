@@ -12,6 +12,8 @@ For compiler failures, make a change that directly alters the rejected type or e
 
 The failure evidence includes compact assertion messages from the Vitest JSON report. Fix the responsible product code or test, not the evidence. Use unique contextual accessible names and scoped Testing Library queries when multiple controls legitimately share a concept. BLOCK-owned setup already cleans the DOM between tests.
 
+A test stack identifies where an expectation observed the failure, not necessarily where the defect lives. If a journey cannot observe required state after a valid action, repair the application or domain behavior. Change the test only when its selector is demonstrably ambiguous or inconsistent with accessible UI that already implements the requirement.
+
 When repairing `src/product/product.test.tsx`, preserve every existing acceptance journey, test case, and assertion intent. Do not delete, merge, skip, weaken, or rename tests merely to make the suite pass. For ambiguous queries, change only the relevant helper/query to scope it to the correct form, region, row, or card.
 
 A selector failure is evidence of a selector class, not permission to fix only the first line. In the same write, audit every analogous query in the permitted test file so later assertions cannot repeat the same zero-match or multiple-match defect. Never query `role="form"` without an explicit accessible name, never query an alert by accessible name, and never use a broad singular text query when an option, status, notice, or card may repeat that text. Preserve all behavioral assertions while making their target unambiguous.

@@ -124,11 +124,12 @@ export async function loadRepairPrompts(
   outputDirectory: string,
   plan: BuildPlan,
   diagnosis: string,
+  sourcePaths: readonly string[] = AGENT_PRODUCT_PATHS,
 ): Promise<{ systemPrompt: string; appContext: string }> {
   const [base, systemPrompt, agentSources] = await Promise.all([
     loadBuilderPrompts(outputDirectory, plan),
     readFile(path.join(REPOSITORY_ROOT, "solution", "repair-prompt.md"), "utf8"),
-    Promise.all(AGENT_PRODUCT_PATHS.map(async (relativePath) => ({
+    Promise.all(sourcePaths.map(async (relativePath) => ({
       relativePath,
       content: await readFile(path.join(outputDirectory, relativePath), "utf8"),
     }))),
