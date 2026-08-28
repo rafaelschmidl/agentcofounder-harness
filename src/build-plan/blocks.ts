@@ -14,6 +14,15 @@ function foundationFiles(config: Record<string, unknown>): MaterializedFile[] {
       path: "src/system/product.ts",
       content: `export const PRODUCT_NAME = ${JSON.stringify(productName)};\n`,
     },
+    {
+      path: "src/test/setup.ts",
+      content: `import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+afterEach(cleanup);
+`,
+    },
   ];
 }
 
@@ -282,7 +291,8 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
       "vitest.config.ts",
       "index.html",
       "AGENTS.md",
-      "src/system/product.ts"
+      "src/system/product.ts",
+      "src/test/setup.ts"
     ],
     exported_interfaces: ["PRODUCT_NAME"],
     materialize: foundationFiles,

@@ -15,4 +15,6 @@ Required work:
 5. Create a deliberate responsive visual system in `src/product/styles.css` suitable for the product domain.
 6. Replace the placeholder test with observable Vitest and Testing Library journeys in `src/product/product.test.tsx` for every BuildPlan verification obligation.
 
+Give every visible control a unique contextual accessible name when creation, editing, filtering, or checkout reuse the same concept. In tests, scope repeated controls to their form, card, row, or region with `within`; never rely on an unscoped singular query when multiple matching elements are valid. The BLOCK-owned test setup cleans the DOM after every test.
+
 Do not use external services, network calls, authentication, or package installation unless the ProductSpec explicitly requires them. Do not merely describe the implementation: finish by writing all four AGENT-owned files.

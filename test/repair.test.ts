@@ -18,6 +18,13 @@ describe("diagnosed repair", () => {
     const output = path.join(directory, "app");
     await mkdir(verification);
     await writeFile(path.join(verification, "app-test.log"), `${output}/src/product/App.tsx failed\n`, "utf8");
+    await writeFile(path.join(verification, "app-test-results.json"), JSON.stringify({
+      testResults: [{ assertionResults: [{
+        title: "uses a unique priority label",
+        status: "failed",
+        failureMessages: ["TestingLibraryElementError: Found multiple elements with the text of: Priority"],
+      }] }],
+    }), "utf8");
     await writeFile(path.join(verification, "app-build.log"), "build failed\n", "utf8");
     await writeFile(path.join(verification, "app-dev.log"), "startup passed\n", "utf8");
 
@@ -26,6 +33,8 @@ describe("diagnosed repair", () => {
     expect(MAX_REPAIR_CYCLES).toBe(2);
     expect(first).toEqual(repeated);
     expect(first.evidence).toContain("<generated-app>/src/product/App.tsx failed");
+    expect(first.evidence).toContain("uses a unique priority label");
+    expect(first.evidence).toContain("Found multiple elements");
     expect(first.key).toMatch(/^[a-f0-9]{64}$/u);
   });
 });
