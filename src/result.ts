@@ -8,6 +8,7 @@ import type {
   TestRun,
   UsageSummary,
 } from "./types.js";
+import type { ProductSpec } from "./product-spec/types.js";
 
 const FALLBACK_PARTIAL: PartialRunResult = {
   status: "failed",
@@ -78,6 +79,27 @@ export async function readPartialResult(appDirectory: string): Promise<PartialRu
   } catch {
     return FALLBACK_PARTIAL;
   }
+}
+
+export function productReport(spec: ProductSpec, verification: AppVerification): PartialRunResult {
+  const journeyResult: TestRun["result"] = verification.passed ? "passed" : "failed";
+  return {
+    status: verification.passed ? "success" : "partial",
+    app_url: "http://localhost:3000",
+    start_command: "npm run dev",
+    summary: verification.passed
+      ? `Generated and verified ${spec.product.summary}`
+      : `Generated ${spec.product.summary}, but one or more harness verification checks failed.`,
+    implemented_features: spec.requirements
+      .filter((requirement) => requirement.disposition === "IMPLEMENT")
+      .map((requirement) => requirement.title),
+    assumptions: [...spec.assumptions],
+    tests_run: spec.acceptance_journeys.map((journey) => ({
+      command: "npm test",
+      journey: journey.title,
+      result: journeyResult,
+    })),
+  };
 }
 
 export function composeResult(

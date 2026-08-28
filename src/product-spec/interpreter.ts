@@ -1,7 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runPi, type CommandResult } from "../run-challenge.js";
+import { runPi, type CommandResult } from "../pi-runner.js";
+import { providerFromEnvironment, providerPiArguments } from "../provider.js";
+import { createPiEnvironment } from "../pi-environment.js";
 import { hashIdea, segmentIdea } from "./fragments.js";
 import type { ProductSpec, SourceFragment } from "./types.js";
 import { validateProductSpec } from "./validate.js";
@@ -29,6 +31,7 @@ export function buildInterpreterPiArguments(
   systemPrompt: string,
   artifactDirectory: string,
 ): string[] {
+  const provider = providerFromEnvironment();
   const args = [
     "--mode",
     "json",
@@ -48,12 +51,9 @@ export function buildInterpreterPiArguments(
     path.join(artifactDirectory, "sessions"),
     "--extension",
     path.join(REPOSITORY_ROOT, "solution", "extensions", "product-spec-interpreter.ts"),
-    "--provider",
-    process.env.CHALLENGE_PROVIDER ?? "berget",
-    "--model",
-    process.env.CHALLENGE_MODEL ?? "Qwen/Qwen3.8-27B-FP8",
+    ...providerPiArguments(provider.provider, provider.model),
     "--thinking",
-    process.env.CHALLENGE_THINKING ?? "medium",
+    provider.thinking,
     [
       "## Raw product idea",
       idea,
@@ -83,7 +83,10 @@ export async function runProductSpecInterpretation(
     stderr: path.join(artifactDirectory, "interpreter.stderr.log"),
   };
   const fragments = segmentIdea(idea);
-  const systemPrompt = await readFile(path.join(REPOSITORY_ROOT, "solution", "interpreter-prompt.md"), "utf8");
+  const [systemPrompt, productSpecSchema] = await Promise.all([
+    readFile(path.join(REPOSITORY_ROOT, "solution", "interpreter-prompt.md"), "utf8"),
+    readFile(path.join(REPOSITORY_ROOT, "src", "product-spec", "product-spec.schema.json"), "utf8"),
+  ]);
   await mkdir(path.join(artifactDirectory, "sessions"), { recursive: true });
   await Promise.all([
     writeFile(files.idea, idea, { encoding: "utf8", flag: "wx" }),
@@ -91,15 +94,19 @@ export async function runProductSpecInterpretation(
     writeFile(files.patternAudit, "", { encoding: "utf8", flag: "wx" }),
   ]);
 
-  const environment: NodeJS.ProcessEnv = {
-    ...process.env,
+  const environment = await createPiEnvironment(artifactDirectory, {
     SYSTEM_V0_IDEA_FILE: files.idea,
     SYSTEM_V0_FRAGMENTS_FILE: files.fragments,
     SYSTEM_V0_PRODUCT_SPEC_FILE: files.productSpec,
     SYSTEM_V0_PATTERN_AUDIT_FILE: files.patternAudit,
-  };
+  });
   const command = await runPi(
-    buildInterpreterPiArguments(idea, fragments, systemPrompt, artifactDirectory),
+    buildInterpreterPiArguments(
+      idea,
+      fragments,
+      `${systemPrompt.trim()}\n\n## Canonical ProductSpec JSON Schema\n\n${productSpecSchema.trim()}`,
+      artifactDirectory,
+    ),
     REPOSITORY_ROOT,
     files.events,
     files.stderr,

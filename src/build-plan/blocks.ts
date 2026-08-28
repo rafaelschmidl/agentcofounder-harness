@@ -1,0 +1,347 @@
+import type { CapabilityBlock, MaterializedFile } from "./types.js";
+
+const objectSchema = (properties: Record<string, unknown>, required: string[] = []) => ({
+  type: "object",
+  additionalProperties: false,
+  required,
+  properties,
+});
+
+function foundationFiles(config: Record<string, unknown>): MaterializedFile[] {
+  const productName = typeof config.product_name === "string" ? config.product_name : "Generated product";
+  return [
+    {
+      path: "src/system/product.ts",
+      content: `export const PRODUCT_NAME = ${JSON.stringify(productName)};\n`,
+    },
+  ];
+}
+
+function repositoryFiles(): MaterializedFile[] {
+  return [
+    {
+      path: "src/system/repository.ts",
+      content: `export interface Repository<T> {
+  load(): T;
+  save(value: T): void;
+}
+
+interface StoredEnvelope<T> {
+  version: number;
+  value: T;
+}
+
+export class LocalStorageRepository<T> implements Repository<T> {
+  constructor(
+    private readonly key: string,
+    private readonly version: number,
+    private readonly fallback: () => T,
+    private readonly isValid: (value: unknown) => value is T,
+  ) {}
+
+  load(): T {
+    try {
+      const raw = localStorage.getItem(this.key);
+      if (raw === null) return this.fallback();
+      const envelope = JSON.parse(raw) as Partial<StoredEnvelope<unknown>>;
+      if (envelope.version !== this.version || !this.isValid(envelope.value)) {
+        return this.recover();
+      }
+      return envelope.value;
+    } catch {
+      return this.recover();
+    }
+  }
+
+  save(value: T): void {
+    localStorage.setItem(this.key, JSON.stringify({ version: this.version, value }));
+  }
+
+  private recover(): T {
+    const value = this.fallback();
+    try {
+      this.save(value);
+    } catch {
+      // The valid in-memory fallback remains usable when storage is unavailable.
+    }
+    return value;
+  }
+}
+`,
+    },
+  ];
+}
+
+function collectionFiles(): MaterializedFile[] {
+  return [
+    {
+      path: "src/system/collection.ts",
+      content: `export interface Identified {
+  id: string;
+}
+
+export function upsertRecord<T extends Identified>(records: readonly T[], next: T): T[] {
+  const index = records.findIndex((record) => record.id === next.id);
+  if (index < 0) return [...records, next];
+  return records.map((record, recordIndex) => (recordIndex === index ? next : record));
+}
+
+export function removeRecord<T extends Identified>(records: readonly T[], id: string): T[] {
+  return records.filter((record) => record.id !== id);
+}
+
+export function countWhere<T>(records: readonly T[], predicate: (record: T) => boolean): number {
+  return records.reduce((count, record) => count + (predicate(record) ? 1 : 0), 0);
+}
+`,
+    },
+  ];
+}
+
+function workflowFiles(): MaterializedFile[] {
+  return [
+    {
+      path: "src/system/workflow.ts",
+      content: `export interface Transition<State extends string> {
+  from: State;
+  to: State;
+}
+
+export type TransitionResult<State extends string> =
+  | { ok: true; state: State }
+  | { ok: false; state: State; error: string };
+
+export function transitionState<State extends string>(
+  current: State,
+  target: State,
+  allowed: readonly Transition<State>[],
+): TransitionResult<State> {
+  if (current === target) return { ok: true, state: current };
+  const permitted = allowed.some((transition) => transition.from === current && transition.to === target);
+  if (!permitted) return { ok: false, state: current, error: \`Cannot move from \${current} to \${target}.\` };
+  return { ok: true, state: target };
+}
+`,
+    },
+  ];
+}
+
+function transactionFiles(): MaterializedFile[] {
+  return [
+    {
+      path: "src/system/transaction.ts",
+      content: `export type TransactionResult<State, Value> =
+  | { ok: true; state: State; value: Value }
+  | { ok: false; state: State; error: string };
+
+export function transact<State, Value>(
+  current: State,
+  prepare: (snapshot: State) => { next: State; value: Value } | { error: string },
+): TransactionResult<State, Value> {
+  const prepared = prepare(current);
+  if ("error" in prepared) return { ok: false, state: current, error: prepared.error };
+  return { ok: true, state: prepared.next, value: prepared.value };
+}
+`,
+    },
+  ];
+}
+
+function paymentFiles(): MaterializedFile[] {
+  return [
+    {
+      path: "src/system/payment.ts",
+      content: `export type PaymentMode = "succeed" | "decline";
+export type PaymentResult =
+  | { ok: true; reference: string }
+  | { ok: false; code: "declined"; message: string };
+
+export interface PaymentProvider {
+  charge(input: { amountMinor: number; mode: PaymentMode }): Promise<PaymentResult>;
+}
+
+export class DeterministicPaymentStub implements PaymentProvider {
+  async charge(input: { amountMinor: number; mode: PaymentMode }): Promise<PaymentResult> {
+    if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor < 0) {
+      return { ok: false, code: "declined", message: "Invalid payment amount." };
+    }
+    if (input.mode === "decline") {
+      return { ok: false, code: "declined", message: "The simulated payment was declined." };
+    }
+    return { ok: true, reference: \`stub-\${input.amountMinor}\` };
+  }
+}
+`,
+    },
+  ];
+}
+
+function accessibleShellFiles(): MaterializedFile[] {
+  return [
+    {
+      path: "src/system/ui.tsx",
+      content: `import type { PropsWithChildren, ReactNode } from "react";
+
+export function AppShell({ title, subtitle, actions, children }: PropsWithChildren<{
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+}>) {
+  return (
+    <div className="app-shell">
+      <header className="app-header">
+        <div>
+          <p className="eyebrow">Local workspace</p>
+          <h1>{title}</h1>
+          {subtitle ? <p className="subtitle">{subtitle}</p> : null}
+        </div>
+        {actions ? <div className="header-actions">{actions}</div> : null}
+      </header>
+      <main>{children}</main>
+    </div>
+  );
+}
+
+export function FieldError({ id, children }: PropsWithChildren<{ id: string }>) {
+  if (!children) return null;
+  return <p id={id} role="alert" className="field-error">{children}</p>;
+}
+
+export function EmptyState({ title, children }: PropsWithChildren<{ title: string }>) {
+  return <section className="empty-state" aria-live="polite"><h2>{title}</h2><p>{children}</p></section>;
+}
+`,
+    },
+  ];
+}
+
+function verificationFiles(): MaterializedFile[] {
+  return [
+    {
+      path: "src/system/test-contract.ts",
+      content: `export const PRODUCT_TEST_CONTRACT = {
+  requiresObservableJourneyTests: true,
+  allowsTodoTests: false,
+  requiresVisibleValidationFeedback: true,
+} as const;
+`,
+    },
+  ];
+}
+
+export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
+  {
+    id: "app.foundation",
+    version: "1.0.0",
+    config_schema: objectSchema({ product_name: { type: "string", minLength: 1 } }, ["product_name"]),
+    capabilities: ["react-vite-app", "typed-extension-boundary"],
+    dependencies: [],
+    conflicts: [],
+    owned_files: [
+      ".gitignore",
+      ".npmrc",
+      "package.json",
+      "package-lock.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "vitest.config.ts",
+      "index.html",
+      "AGENTS.md",
+      "src/system/product.ts"
+    ],
+    exported_interfaces: ["PRODUCT_NAME"],
+    materialize: foundationFiles,
+    checks: ["npm run build"],
+  },
+  {
+    id: "data.local-repository",
+    version: "1.0.0",
+    config_schema: objectSchema(
+      { storage_key: { type: "string", minLength: 1 }, schema_version: { type: "integer", minimum: 1 } },
+      ["storage_key", "schema_version"],
+    ),
+    capabilities: ["local-persistence", "schema-versioning", "malformed-data-recovery", "repository-interface"],
+    dependencies: ["app.foundation"],
+    conflicts: ["data.external-repository"],
+    owned_files: ["src/system/repository.ts"],
+    exported_interfaces: ["Repository", "LocalStorageRepository"],
+    materialize: repositoryFiles,
+    checks: ["reload persistence", "malformed storage recovery"],
+  },
+  {
+    id: "domain.collection",
+    version: "1.0.0",
+    config_schema: objectSchema({ entity_ids: { type: "array", items: { type: "string" } } }, ["entity_ids"]),
+    capabilities: ["record-create", "record-list", "record-update", "record-delete", "filtering", "derived-metrics"],
+    dependencies: ["app.foundation"],
+    conflicts: [],
+    owned_files: ["src/system/collection.ts"],
+    exported_interfaces: ["Identified", "upsertRecord", "removeRecord", "countWhere"],
+    materialize: collectionFiles,
+    checks: ["CRUD journey tests", "filter tests", "metric tests"],
+  },
+  {
+    id: "domain.workflow",
+    version: "1.0.0",
+    config_schema: objectSchema({ workflow_ids: { type: "array", items: { type: "string" } } }, ["workflow_ids"]),
+    capabilities: ["state-machine", "transition-guards", "invalid-transition-feedback"],
+    dependencies: ["app.foundation"],
+    conflicts: [],
+    owned_files: ["src/system/workflow.ts"],
+    exported_interfaces: ["Transition", "TransitionResult", "transitionState"],
+    materialize: workflowFiles,
+    checks: ["allowed transition tests", "invalid transition tests"],
+  },
+  {
+    id: "domain.transaction",
+    version: "1.0.0",
+    config_schema: objectSchema({ mode: { const: "atomic-local" } }, ["mode"]),
+    capabilities: ["atomic-effects", "failure-rollback", "idempotent-submit"],
+    dependencies: ["app.foundation"],
+    conflicts: [],
+    owned_files: ["src/system/transaction.ts"],
+    exported_interfaces: ["TransactionResult", "transact"],
+    materialize: transactionFiles,
+    checks: ["success commits once", "failure preserves state"],
+  },
+  {
+    id: "integration.payment-stub",
+    version: "1.0.0",
+    config_schema: objectSchema({ modes: { type: "array", items: { enum: ["succeed", "decline"] } } }, ["modes"]),
+    capabilities: ["payment-provider-interface", "deterministic-success", "deterministic-decline", "no-network-payment"],
+    dependencies: ["domain.transaction"],
+    conflicts: ["integration.real-payment"],
+    owned_files: ["src/system/payment.ts"],
+    exported_interfaces: ["PaymentProvider", "PaymentMode", "PaymentResult", "DeterministicPaymentStub"],
+    materialize: paymentFiles,
+    checks: ["stub success test", "stub decline test", "no payment network test"],
+  },
+  {
+    id: "ui.accessible-shell",
+    version: "1.0.0",
+    config_schema: objectSchema({}, []),
+    capabilities: ["responsive-shell", "accessible-forms", "empty-states", "visible-errors"],
+    dependencies: ["app.foundation"],
+    conflicts: [],
+    owned_files: ["src/system/ui.tsx"],
+    exported_interfaces: ["AppShell", "FieldError", "EmptyState"],
+    materialize: accessibleShellFiles,
+    checks: ["accessible names", "keyboard operation", "responsive layout"],
+  },
+  {
+    id: "verification.product",
+    version: "1.0.0",
+    config_schema: objectSchema({ journey_ids: { type: "array", items: { type: "string" } } }, ["journey_ids"]),
+    capabilities: ["journey-tests", "typecheck", "production-build"],
+    dependencies: ["app.foundation"],
+    conflicts: [],
+    owned_files: ["src/system/test-contract.ts"],
+    exported_interfaces: ["PRODUCT_TEST_CONTRACT"],
+    materialize: verificationFiles,
+    checks: ["npm test", "npm run build"],
+  },
+];
+
+export function capabilityBlock(blockId: string): CapabilityBlock | undefined {
+  return CAPABILITY_BLOCKS.find((block) => block.id === blockId);
+}

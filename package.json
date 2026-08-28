@@ -8,7 +8,7 @@
     "node": ">=22.19.0 <23"
   },
   "scripts": {
-    "challenge": "node --import tsx src/run-challenge.ts",
+    "challenge": "node --env-file-if-exists=.env.local --import tsx src/run-challenge.ts",
     "validate:result": "node --import tsx src/validate-result.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -17,6 +17,8 @@
     "check": "npm run typecheck && npm run test && npm run app:test && npm run app:build"
   },
   "dependencies": {
+    "@bergetai/pi-provider": "0.3.2",
+    "@earendil-works/pi-ai": "0.84.1",
     "@earendil-works/pi-coding-agent": "0.84.1",
     "ajv": "8.20.0",
     "typebox": "1.3.7"

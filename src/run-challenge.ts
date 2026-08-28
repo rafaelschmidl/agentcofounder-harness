@@ -1,19 +1,29 @@
 import { spawn } from "node:child_process";
-import { createWriteStream } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prepareOutput } from "./prepare-output.js";
+import { buildBuilderPiArguments, loadBuilderPrompts } from "./builder.js";
+import { compileProductSpec } from "./build-plan/compile.js";
+import {
+  linkBuildPlan,
+  materializeBuildPlan,
+  writeCompilerArtifacts,
+} from "./build-plan/materialize.js";
+import { validateBuildPlan } from "./build-plan/validate.js";
+import { createPiEnvironment } from "./pi-environment.js";
+import { runPi } from "./pi-runner.js";
+import { runProductSpecInterpretation } from "./product-spec/interpreter.js";
 import { auditAppPortAfterPi } from "./port-owner.js";
-import { signalProcessTree, terminateProcessTree, usesDetachedProcessGroup } from "./process-tree.js";
 import {
   composeResult,
   missingRequiredResultPaths,
-  readPartialResult,
+  productReport,
   rootStartCommand,
   writeResult,
 } from "./result.js";
 import { collectUsageFromJsonLines } from "./usage.js";
+import { RunTrace } from "./trace.js";
 import type { RunResult } from "./types.js";
 import { validateResultObject } from "./validate-result.js";
 import { portHasListener, unavailableAppVerification, verifyGeneratedApp } from "./verify-app.js";
@@ -25,14 +35,11 @@ interface Arguments {
   skipAppInstall: boolean;
 }
 
-export interface CommandResult {
-  exitCode: number;
-  timedOut: boolean;
-}
-
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
 const APP_PORT = 3000;
+
+export { runPi, type CommandResult } from "./pi-runner.js";
 
 export function runRequiresFailureExit(
   piExitCode: number,
@@ -107,93 +114,6 @@ async function runInherited(command: string, args: string[], cwd: string): Promi
   });
 }
 
-function summarizeEventLine(line: string): void {
-  try {
-    const event = JSON.parse(line) as Record<string, unknown>;
-    if (event.type === "tool_execution_end") {
-      console.log(`[pi] completed tool: ${String(event.toolName ?? "unknown")}`);
-    }
-    if (event.type === "message_end") {
-      const message = event.message as Record<string, unknown> | undefined;
-      const usage = message?.usage as Record<string, unknown> | undefined;
-      if (message?.role === "assistant" && usage) {
-        console.log(
-          `[pi] model call completed: input=${String(usage.input ?? 0)} output=${String(usage.output ?? 0)}`,
-        );
-      }
-    }
-  } catch {
-    // The unmodified line remains in events.jsonl for independent inspection.
-  }
-}
-
-export async function runPi(
-  args: string[],
-  cwd: string,
-  eventFile: string,
-  stderrFile: string,
-  timeoutMs: number,
-  environment: NodeJS.ProcessEnv = process.env,
-): Promise<CommandResult> {
-  const events = createWriteStream(eventFile, { flags: "wx" });
-  const errors = createWriteStream(stderrFile, { flags: "wx" });
-  let lineBuffer = "";
-  let piChild: ReturnType<typeof spawn> | undefined;
-
-  try {
-    return await new Promise<CommandResult>((resolve, reject) => {
-      const piBinary = path.join(
-        REPOSITORY_ROOT,
-        "node_modules",
-        ".bin",
-        process.platform === "win32" ? "pi.cmd" : "pi",
-      );
-      const child = spawn(piBinary, args, {
-        cwd,
-        detached: usesDetachedProcessGroup(),
-        env: { ...environment, PI_OFFLINE: "1" },
-        shell: false,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      piChild = child;
-      let timedOut = false;
-      let killTimer: NodeJS.Timeout | undefined;
-      const timeout = setTimeout(() => {
-        timedOut = true;
-        signalProcessTree(child, "SIGTERM");
-        killTimer = setTimeout(() => signalProcessTree(child, "SIGKILL"), 5_000);
-      }, timeoutMs);
-
-      child.stdout.on("data", (chunk: Buffer) => {
-        events.write(chunk);
-        lineBuffer += chunk.toString("utf8");
-        const lines = lineBuffer.split(/\r?\n/u);
-        lineBuffer = lines.pop() ?? "";
-        for (const line of lines) summarizeEventLine(line);
-      });
-      child.stderr.pipe(errors);
-      child.stderr.pipe(process.stderr);
-      child.once("error", (error) => {
-        clearTimeout(timeout);
-        if (killTimer) clearTimeout(killTimer);
-        reject(error);
-      });
-      child.once("close", (code) => {
-        clearTimeout(timeout);
-        if (killTimer) clearTimeout(killTimer);
-        if (lineBuffer !== "") summarizeEventLine(lineBuffer);
-        resolve({ exitCode: timedOut ? 124 : (code ?? 1), timedOut });
-      });
-    });
-  } finally {
-    if (piChild) await terminateProcessTree(piChild);
-    await Promise.all([
-      new Promise<void>((resolve) => events.end(resolve)),
-      new Promise<void>((resolve) => errors.end(resolve)),
-    ]);
-  }
-}
-
 export function buildPiArguments(
   idea: string,
   systemPrompt: string,
@@ -237,6 +157,12 @@ function timeoutFromEnvironment(): number {
 
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2));
+  const runDeadline = Date.now() + timeoutFromEnvironment();
+  const remainingTime = (): number => {
+    const remaining = runDeadline - Date.now();
+    if (remaining < 1_000) throw new Error("System v0 exceeded CHALLENGE_TIMEOUT_MS");
+    return remaining;
+  };
   const idea = await readFile(args.ideaFile, "utf8");
   const outputDirectory = await prepareOutput(REPOSITORY_ROOT, args.outputDirectory);
   console.log(`Prepared clean application workspace: ${outputDirectory}`);
@@ -251,27 +177,79 @@ async function main(): Promise<void> {
   }
   if (args.prepareOnly) return;
 
-  const [systemPrompt, publicJourneys, appContext] = await Promise.all([
-    readFile(path.join(REPOSITORY_ROOT, "solution", "system-prompt.md"), "utf8"),
-    readFile(path.join(REPOSITORY_ROOT, "contract-public", "journeys.md"), "utf8"),
-    readFile(path.join(outputDirectory, "AGENTS.md"), "utf8"),
-  ]);
-
   const runId = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
   const artifactDirectory = path.join(REPOSITORY_ROOT, "artifacts", "runs", runId);
-  await mkdir(path.join(artifactDirectory, "sessions"), { recursive: true });
+  const interpreterDirectory = path.join(artifactDirectory, "interpreter");
+  const builderDirectory = path.join(artifactDirectory, "builder");
+  await Promise.all([
+    mkdir(interpreterDirectory, { recursive: true }),
+    mkdir(builderDirectory, { recursive: true }),
+  ]);
   await writeFile(path.join(artifactDirectory, "idea.txt"), idea, "utf8");
+  const traceFile = path.join(artifactDirectory, "trace.jsonl");
+  const trace = await RunTrace.create(traceFile);
+  await trace.record("interpretation", "started", "Started ProductSpec interpretation from the raw idea.");
 
-  const eventFile = path.join(artifactDirectory, "events.jsonl");
-  const stderrFile = path.join(artifactDirectory, "pi.stderr.log");
   const appPortHadListenerBeforePi = await portHasListener(APP_PORT);
-  const pi = await runPi(
-    buildPiArguments(idea, systemPrompt, publicJourneys, appContext, artifactDirectory),
+  const interpretation = await runProductSpecInterpretation(idea, interpreterDirectory, remainingTime());
+  if (interpretation.command.exitCode !== 0 || !interpretation.spec || interpretation.errors.length > 0) {
+    await trace.record("interpretation", "failed", "ProductSpec interpretation did not produce a valid specification.", {
+      exit_code: interpretation.command.exitCode,
+      errors: interpretation.errors,
+    });
+    throw new Error(`ProductSpec interpretation failed: ${interpretation.errors.join("; ")}`);
+  }
+  const spec = interpretation.spec;
+  await trace.record("interpretation", "completed", "Validated ProductSpec v0.1.", {
+    requirements: spec.requirements.length,
+    journeys: spec.acceptance_journeys.length,
+    selected_patterns: spec.selected_patterns,
+  });
+
+  await trace.record("compilation", "started", "Started deterministic ProductSpec compilation.");
+  const plan = compileProductSpec(spec);
+  const planValidation = validateBuildPlan(plan, spec);
+  if (!planValidation.valid) {
+    await trace.record("compilation", "failed", "BuildPlan validation failed.", { errors: planValidation.errors });
+    throw new Error(`BuildPlan validation failed: ${planValidation.errors.join("; ")}`);
+  }
+  await Promise.all([
+    writeFile(path.join(artifactDirectory, "idea_spec.json"), `${JSON.stringify(spec, null, 2)}\n`, "utf8"),
+    writeFile(path.join(artifactDirectory, "build_plan.json"), `${JSON.stringify(plan, null, 2)}\n`, "utf8"),
+  ]);
+  await materializeBuildPlan(plan, spec, outputDirectory);
+  await writeCompilerArtifacts(plan, spec, outputDirectory);
+  await trace.record("compilation", "completed", "BuildPlan validated and deterministic blocks materialized.", {
+    blocks: plan.blocks.map((block) => `${block.id}@${block.version}`),
+    custom_slots: plan.custom_slots.map((slot) => slot.id),
+  });
+
+  await trace.record("customization", "started", "Started constrained product customization.");
+  const prompts = await loadBuilderPrompts(outputDirectory);
+  const builderEvents = path.join(builderDirectory, "events.jsonl");
+  const builderStderr = path.join(builderDirectory, "pi.stderr.log");
+  const builderEnvironment = await createPiEnvironment(builderDirectory, {
+    SYSTEM_V0_OWNERSHIP_FILE: path.join(outputDirectory, "file_ownership.json"),
+  });
+  const builder = await runPi(
+    buildBuilderPiArguments(spec, plan, prompts.systemPrompt, prompts.appContext, builderDirectory),
     outputDirectory,
-    eventFile,
-    stderrFile,
-    timeoutFromEnvironment(),
+    builderEvents,
+    builderStderr,
+    remainingTime(),
+    builderEnvironment,
   );
+  if (builder.exitCode !== 0) {
+    await trace.record("customization", "failed", "The constrained builder did not complete.", {
+      exit_code: builder.exitCode,
+      timed_out: builder.timedOut,
+    });
+  } else {
+    await trace.record("customization", "completed", "The constrained builder completed within AGENT-owned files.");
+  }
+  await linkBuildPlan(plan, spec, outputDirectory);
+  await trace.record("linking", "completed", "Deterministic routes, exports, and entry points were linked.");
+
   const portReclamation = await auditAppPortAfterPi(APP_PORT, outputDirectory, appPortHadListenerBeforePi);
   if (portReclamation.listener_after_pi) {
     const message = `${portReclamation.diagnostic}; pids=${portReclamation.process_ids.join(",") || "none"}`;
@@ -279,27 +257,44 @@ async function main(): Promise<void> {
     else console.warn(message);
   }
 
-  const usage = collectUsageFromJsonLines(await readFile(eventFile, "utf8"));
-  const partial = await readPartialResult(outputDirectory);
-  const canVerifyApp = pi.exitCode === 0 && usage.model_calls > 0;
+  const eventFile = path.join(artifactDirectory, "events.jsonl");
+  const eventContent = [
+    await readFile(interpretation.files.events, "utf8"),
+    await readFile(builderEvents, "utf8"),
+  ].join("");
+  await writeFile(eventFile, eventContent, { encoding: "utf8", flag: "wx" });
+  const usage = collectUsageFromJsonLines(eventContent);
+  const responseLimitPassed = usage.model_calls <= 16 && usage.call_log.every((call) => call.output_tokens <= 4_096);
+  const piExitCode = interpretation.command.exitCode !== 0
+    ? interpretation.command.exitCode
+    : builder.exitCode !== 0 || !responseLimitPassed
+      ? (builder.exitCode || 1)
+      : 0;
+  const canVerifyApp = piExitCode === 0 && usage.model_calls > 0;
   const startCommand = rootStartCommand(REPOSITORY_ROOT, outputDirectory);
   let verification = unavailableAppVerification(
     canVerifyApp ? "app verification had not completed" : "Pi did not complete with audited model usage",
   );
-  let result = composeResult(partial, usage, pi.exitCode, verification, portReclamation, startCommand);
+  if (canVerifyApp) {
+    await trace.record("verification", "started", "Started generated application verification.");
+    verification = await verifyGeneratedApp(outputDirectory, artifactDirectory, { displayRoot: REPOSITORY_ROOT });
+    await trace.record(
+      "verification",
+      verification.passed ? "completed" : "failed",
+      verification.passed ? "All harness verification gates passed." : "One or more harness verification gates failed.",
+      { checks: verification.checks },
+    );
+  }
+  const partial = productReport(spec, verification);
+  await Promise.all([
+    writeFile(path.join(outputDirectory, "report.partial.json"), `${JSON.stringify(partial, null, 2)}\n`, "utf8"),
+    writeFile(path.join(artifactDirectory, "report.partial.json"), `${JSON.stringify(partial, null, 2)}\n`, "utf8"),
+  ]);
+  let result = composeResult(partial, usage, piExitCode, verification, portReclamation, startCommand);
   const appResultPath = path.join(outputDirectory, "result.json");
   const rootResultPath = path.join(REPOSITORY_ROOT, "result.json");
   const requiredResultPaths = [appResultPath, rootResultPath];
-  let resultPaths = await writeResult(
-    outputDirectory,
-    result,
-    [rootResultPath],
-  );
-  if (canVerifyApp) {
-    verification = await verifyGeneratedApp(outputDirectory, artifactDirectory, { displayRoot: REPOSITORY_ROOT });
-    result = composeResult(partial, usage, pi.exitCode, verification, portReclamation, startCommand);
-    resultPaths = await writeResult(outputDirectory, result, [rootResultPath]);
-  }
+  const resultPaths = await writeResult(outputDirectory, result, [rootResultPath]);
   const missingResultPaths = missingRequiredResultPaths(resultPaths, requiredResultPaths);
   const validationErrors = await validateResultObject(result);
   if (validationErrors.length > 0) {
@@ -307,14 +302,22 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
+  await trace.record("delivery", "completed", "Validated result and retained System v0 artifacts.", {
+    status: result.status,
+    model_calls: result.model_calls,
+    cost_total: result.cost_total,
+  });
+  await copyFile(traceFile, path.join(outputDirectory, "trace.jsonl"));
 
   console.log(`Result written to ${resultPaths.join(" and ")}`);
   console.log(`Audit artifacts written to ${artifactDirectory}`);
   for (const missingResultPath of missingResultPaths) {
     console.error(`Required result destination was not written: ${missingResultPath}`);
   }
-  if (pi.timedOut) console.error("Pi exceeded CHALLENGE_TIMEOUT_MS and was terminated.");
-  if (runRequiresFailureExit(pi.exitCode, result.status, missingResultPaths)) process.exitCode = 1;
+  if (interpretation.command.timedOut || builder.timedOut) {
+    console.error("System v0 exceeded CHALLENGE_TIMEOUT_MS and was terminated.");
+  }
+  if (runRequiresFailureExit(piExitCode, result.status, missingResultPaths)) process.exitCode = 1;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
