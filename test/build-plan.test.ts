@@ -136,6 +136,7 @@ describe("deterministic BuildPlan compiler", () => {
 
     expect(await readFile(agentFile, "utf8")).toBe("export const preserved = true;\n");
     expect(await readFile(path.join(directory, "src/system/collection.ts"), "utf8")).toContain("upsertRecord");
+    expect(await readFile(path.join(directory, "src/test/setup.ts"), "utf8")).toContain("afterEach(cleanup)");
     expect(JSON.parse(await readFile(path.join(directory, "build_plan.json"), "utf8"))).toEqual(plan);
     expect(await readFile(path.join(directory, "src/App.tsx"), "utf8")).toContain("./product/App");
   });

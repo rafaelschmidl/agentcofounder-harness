@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prepareOutput } from "./prepare-output.js";
@@ -53,6 +53,30 @@ export function runRequiresFailureExit(
   missingResultPaths: string[],
 ): boolean {
   return missingResultPaths.length > 0 || piExitCode !== 0 || resultStatus !== "success";
+}
+
+async function readRetainedPiEvents(artifactDirectory: string): Promise<string> {
+  const eventFiles = [
+    path.join(artifactDirectory, "interpreter", "interpreter.events.jsonl"),
+    path.join(artifactDirectory, "builder", "events.jsonl"),
+  ];
+  const repairsDirectory = path.join(artifactDirectory, "repairs");
+  try {
+    const repairAttempts = (await readdir(repairsDirectory, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && /^attempt-\d+$/u.test(entry.name))
+      .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }));
+    eventFiles.push(...repairAttempts.map((entry) => path.join(repairsDirectory, entry.name, "events.jsonl")));
+  } catch {
+    // A failed run may not have reached repair.
+  }
+  const retained = await Promise.all(eventFiles.map(async (file) => {
+    try {
+      return await readFile(file, "utf8");
+    } catch {
+      return "";
+    }
+  }));
+  return retained.join("");
 }
 
 function printHelp(): void {
@@ -413,18 +437,7 @@ async function main(): Promise<void> {
   if (runRequiresFailureExit(piExitCode, result.status, missingResultPaths)) process.exitCode = 1;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const readEventEvidence = async (relativePath: string): Promise<string> => {
-      if (!artifactDirectory) return "";
-      try {
-        return await readFile(path.join(artifactDirectory, relativePath), "utf8");
-      } catch {
-        return "";
-      }
-    };
-    const eventContent = [
-      await readEventEvidence("interpreter/interpreter.events.jsonl"),
-      await readEventEvidence("builder/events.jsonl"),
-    ].join("");
+    const eventContent = artifactDirectory ? await readRetainedPiEvents(artifactDirectory) : "";
     const usage = collectUsageFromJsonLines(eventContent);
     const verification = unavailableAppVerification(message);
     const portReclamation = {
