@@ -6,6 +6,7 @@ import { buildInterpreterPiArguments } from "../src/product-spec/interpreter.js"
 import { segmentIdea } from "../src/product-spec/fragments.js";
 import { submitProductSpecCandidate, submitProductSpecDraftCandidate } from "../src/product-spec/submit.js";
 import { SAMPLE_IDEA, validProductSpec } from "./fixtures/product-spec.js";
+import { productSpecDraftSchema } from "../solution/extensions/product-spec-interpreter.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -14,6 +15,19 @@ afterEach(async () => {
 });
 
 describe("ProductSpec interpreter boundary", () => {
+  it("derives a compact tool schema with deterministic source fields removed", () => {
+    const schema = productSpecDraftSchema() as {
+      required: string[];
+      properties: Record<string, unknown>;
+      $defs: { sourceReference: Record<string, unknown> };
+    };
+    expect(schema.required).not.toContain("source_idea_hash");
+    expect(schema.required).not.toContain("source_fragments");
+    expect(schema.properties).not.toHaveProperty("source_idea_hash");
+    expect(schema.properties).not.toHaveProperty("source_fragments");
+    expect(schema.$defs.sourceReference.type).toBe("string");
+  });
+
   it("enables only offline retrieval and submission tools", () => {
     const previous = {
       provider: process.env.CHALLENGE_PROVIDER,

@@ -36,4 +36,4 @@ The compact draft contains every ProductSpec v0.1 field except `source_idea_hash
 
 Use compact IDs such as `actor_owner`, `req_add_record`, and `journey_add_record`. Keep descriptions, steps, and outcomes terse but testable. Combine related behaviors into one requirement or journey when their provenance and acceptance path are the same. Arrays may be empty only when the idea does not need that concept.
 
-After pattern retrieval, immediately call `submit_product_spec` with compact JSON. Do not narrate, calculate offsets, repeat the source text, or emit hidden fields. Keep the complete tool call below 3,500 output tokens. Repair only returned validation errors in the same session.
+After pattern retrieval, immediately call `submit_product_spec` with the compact draft object in its `draft` argument. Its tool schema is authoritative for required fields and uppercase enum values. Do not narrate, calculate offsets, repeat the source text, encode the draft as a JSON string, or emit hidden fields. Keep the complete tool call below 3,500 output tokens. Repair only returned validation errors in the same session.

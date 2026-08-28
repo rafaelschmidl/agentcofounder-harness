@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -11,6 +12,33 @@ function requiredEnvironment(name: string): string {
   if (!value) throw new Error(`${name} is required for the ProductSpec interpreter`);
   return value;
 }
+
+export function productSpecDraftSchema(): Record<string, unknown> {
+  const schema = JSON.parse(
+    readFileSync(new URL("../../src/product-spec/product-spec.schema.json", import.meta.url), "utf8"),
+  ) as {
+    required: string[];
+    properties: Record<string, unknown>;
+    $defs: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  schema.required = schema.required.filter(
+    (field) => field !== "source_idea_hash" && field !== "source_fragments",
+  );
+  delete schema.properties.source_idea_hash;
+  delete schema.properties.source_fragments;
+  schema.$defs.sourceReference = {
+    type: "string",
+    pattern: "^fragment-[a-f0-9]{12}-[1-9][0-9]*$",
+    description: "Runner-provided source fragment ID; exact quote and offsets are injected deterministically",
+  };
+  delete schema.$schema;
+  delete schema.$id;
+  schema.title = "Compact ProductSpec semantic draft";
+  return schema;
+}
+
+const draftSchema = productSpecDraftSchema();
 
 export default function productSpecInterpreter(pi: ExtensionAPI) {
   const ideaFile = requiredEnvironment("SYSTEM_V0_IDEA_FILE");
@@ -52,7 +80,7 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
         "Use submit_product_spec as the final action. If it returns validation errors, repair only those errors and submit again in the same session.",
       ],
       parameters: Type.Object({
-        spec_json: Type.String({ minLength: 2, description: "Compact ProductSpec draft JSON using fragment ID arrays for source_refs" }),
+        draft: Type.Unsafe<unknown>(draftSchema),
       }),
       async execute(_toolCallId, params) {
         const [idea, fragmentsJson] = await Promise.all([
@@ -60,7 +88,7 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
           readFile(fragmentsFile, "utf8"),
         ]);
         const fragments = JSON.parse(fragmentsJson) as SourceFragment[];
-        const submission = await submitProductSpecDraftCandidate(params.spec_json, idea, fragments, outputFile);
+        const submission = await submitProductSpecDraftCandidate(JSON.stringify(params.draft), idea, fragments, outputFile);
         if (!submission.accepted) {
           return {
             content: [
