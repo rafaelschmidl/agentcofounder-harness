@@ -39,7 +39,7 @@ export async function createPiEnvironment(
         providers: {
           berget: {
             modelOverrides: {
-              [DEFAULT_MODEL]: { maxTokens: 4096 },
+              [DEFAULT_MODEL]: { maxTokens: 8192 },
             },
           },
         },

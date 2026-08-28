@@ -44,6 +44,8 @@ interface Arguments {
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
 const APP_PORT = 3000;
+const MAX_PROVIDER_RESPONSES = 32;
+const MAX_PROVIDER_OUTPUT_TOKENS = 8_192;
 
 export { runPi, type CommandResult } from "./pi-runner.js";
 
@@ -94,7 +96,7 @@ Environment:
   CHALLENGE_MODEL         Optional Pi model override
   CHALLENGE_THINKING      Optional Pi thinking level (default: off)
   CHALLENGE_BUILDER_THINKING Optional builder thinking level (default: off)
-  CHALLENGE_TIMEOUT_MS    Wall-clock limit for Pi (default: 900000)
+  CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 1800000)
 `);
 }
 
@@ -178,7 +180,7 @@ export function buildPiArguments(
 }
 
 function timeoutFromEnvironment(): number {
-  const raw = process.env.CHALLENGE_TIMEOUT_MS ?? "900000";
+  const raw = process.env.CHALLENGE_TIMEOUT_MS ?? "1800000";
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < 1_000) {
     throw new Error("CHALLENGE_TIMEOUT_MS must be an integer of at least 1000");
@@ -273,7 +275,7 @@ async function main(): Promise<void> {
     builderStderr,
     remainingTime(),
     builderEnvironment,
-    Math.max(1, 16 - interpretation.command.modelCalls),
+    Math.max(1, MAX_PROVIDER_RESPONSES - interpretation.command.modelCalls),
     4,
   );
   if (builder.exitCode !== 0) {
@@ -322,7 +324,7 @@ async function main(): Promise<void> {
       }
       diagnosisKeys.add(diagnosis.key);
       const priorEvents = (await Promise.all(stageEventFiles.map((file) => readFile(file, "utf8")))).join("");
-      const remainingCalls = 16 - collectUsageFromJsonLines(priorEvents).model_calls;
+      const remainingCalls = MAX_PROVIDER_RESPONSES - collectUsageFromJsonLines(priorEvents).model_calls;
       if (remainingCalls < 1) {
         await trace.record("repair", "failed", "No provider responses remained for diagnosed repair.", {
           attempt: attempt + 1,
@@ -397,7 +399,8 @@ async function main(): Promise<void> {
   const eventContent = (await Promise.all(stageEventFiles.map((file) => readFile(file, "utf8")))).join("");
   await writeFile(eventFile, eventContent, { encoding: "utf8", flag: "wx" });
   const usage = collectUsageFromJsonLines(eventContent);
-  const responseLimitPassed = usage.model_calls <= 16 && usage.call_log.every((call) => call.output_tokens <= 4_096);
+  const responseLimitPassed = usage.model_calls <= MAX_PROVIDER_RESPONSES &&
+    usage.call_log.every((call) => call.output_tokens <= MAX_PROVIDER_OUTPUT_TOKENS);
   const piExitCode = interpretation.command.exitCode !== 0
     ? interpretation.command.exitCode
     : customizationExitCode !== 0 || !responseLimitPassed

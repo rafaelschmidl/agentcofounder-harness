@@ -100,10 +100,10 @@ Working development configuration:
 - Provider: `berget`
 - Model: `Qwen/Qwen3.8-27B-FP8`
 - Thinking: `medium`
-- Maximum 16 provider responses per app run
-- Maximum 4,096 output tokens per response
+- Maximum 32 provider responses per app run
+- Maximum 8,192 output tokens per response
 - Maximum two repair cycles
-- 15-minute wall-clock limit per run
+- 30-minute wall-clock limit per run
 - EUR 5 cumulative budget across this push
 
 Keep provider settings configurable and credentials environment-only. Isolate HOME, XDG, Pi state, sessions, and generated workspaces. Only allowlisted runtime variables reach Pi, and credentials and challenge controls are stripped from model-invoked shell processes.

@@ -4,7 +4,7 @@ Implement the product-specific experience described by the supplied ProductSpec 
 
 The deterministic compiler has already materialized infrastructure and typed interfaces. Their exact contents are supplied below, so no file reads are needed. You may write only the AGENT-owned files listed in BuildPlan. Do not request new dependencies, change configuration, edit system modules, or write runner artifacts.
 
-The complete interpretation and build may use at most 16 provider responses. Do not output analysis, planning, explanations, code fences, or prose. Your first response must immediately call `write`. Write exactly one complete AGENT-owned file per response, using one `write` tool call. Use this order: `src/product/domain.ts`, `src/product/App.tsx`, `src/product/product.test.tsx`, then `src/product/styles.css`. Keep every file below 9,500 characters so its complete tool arguments fit in one response. After the fourth successful write, stop. Deterministic verification will provide targeted failure evidence if repair is needed.
+The complete interpretation, build, and repair loop has a shared bounded response budget. Do not output analysis, planning, explanations, code fences, or prose. Your first response must immediately call `write`. Write exactly one complete AGENT-owned file per response, using one `write` tool call. Use this order: `src/product/domain.ts`, `src/product/App.tsx`, `src/product/product.test.tsx`, then `src/product/styles.css`. Keep every file below 9,500 characters so its complete tool arguments fit in one response. After the fourth successful write, stop. Deterministic verification will provide targeted failure evidence if repair is needed.
 
 Required work:
 
