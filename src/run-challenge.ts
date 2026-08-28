@@ -177,8 +177,12 @@ async function main(): Promise<void> {
   }
   if (args.prepareOnly) return;
 
+  let artifactDirectory: string | undefined;
+  let traceFile: string | undefined;
+  let trace: RunTrace | undefined;
+  try {
   const runId = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
-  const artifactDirectory = path.join(REPOSITORY_ROOT, "artifacts", "runs", runId);
+  artifactDirectory = path.join(REPOSITORY_ROOT, "artifacts", "runs", runId);
   const interpreterDirectory = path.join(artifactDirectory, "interpreter");
   const builderDirectory = path.join(artifactDirectory, "builder");
   await Promise.all([
@@ -186,8 +190,8 @@ async function main(): Promise<void> {
     mkdir(builderDirectory, { recursive: true }),
   ]);
   await writeFile(path.join(artifactDirectory, "idea.txt"), idea, "utf8");
-  const traceFile = path.join(artifactDirectory, "trace.jsonl");
-  const trace = await RunTrace.create(traceFile);
+  traceFile = path.join(artifactDirectory, "trace.jsonl");
+  trace = await RunTrace.create(traceFile);
   await trace.record("interpretation", "started", "Started ProductSpec interpretation from the raw idea.");
 
   const appPortHadListenerBeforePi = await portHasListener(APP_PORT);
@@ -319,6 +323,63 @@ async function main(): Promise<void> {
     console.error("System v0 exceeded CHALLENGE_TIMEOUT_MS and was terminated.");
   }
   if (runRequiresFailureExit(piExitCode, result.status, missingResultPaths)) process.exitCode = 1;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const readEventEvidence = async (relativePath: string): Promise<string> => {
+      if (!artifactDirectory) return "";
+      try {
+        return await readFile(path.join(artifactDirectory, relativePath), "utf8");
+      } catch {
+        return "";
+      }
+    };
+    const eventContent = [
+      await readEventEvidence("interpreter/interpreter.events.jsonl"),
+      await readEventEvidence("builder/events.jsonl"),
+    ].join("");
+    const usage = collectUsageFromJsonLines(eventContent);
+    const verification = unavailableAppVerification(message);
+    const portReclamation = {
+      preexisting_listener: false,
+      listener_after_pi: false,
+      attempted: false,
+      reclaimed: false,
+      process_ids: [],
+      diagnostic: "Run failed before the final port reclamation audit completed.",
+    };
+    const partial = {
+      status: "failed" as const,
+      app_url: "http://localhost:3000",
+      start_command: "npm run dev",
+      summary: `System v0 failed: ${message}`,
+      implemented_features: [],
+      assumptions: [],
+      tests_run: [],
+    };
+    const result = composeResult(
+      partial,
+      usage,
+      1,
+      verification,
+      portReclamation,
+      rootStartCommand(REPOSITORY_ROOT, outputDirectory),
+    );
+    await writeFile(path.join(outputDirectory, "report.partial.json"), `${JSON.stringify(partial, null, 2)}\n`, "utf8");
+    await writeResult(outputDirectory, result, [path.join(REPOSITORY_ROOT, "result.json")]);
+    if (artifactDirectory) {
+      await writeFile(path.join(artifactDirectory, "report.partial.json"), `${JSON.stringify(partial, null, 2)}\n`, "utf8");
+    }
+    if (trace && traceFile) {
+      await trace.record("delivery", "failed", "Retained truthful failure artifacts.", {
+        error: message,
+        model_calls: usage.model_calls,
+        cost_total: usage.cost_total,
+      });
+      await copyFile(traceFile, path.join(outputDirectory, "trace.jsonl"));
+    }
+    console.error(message);
+    process.exitCode = 1;
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
