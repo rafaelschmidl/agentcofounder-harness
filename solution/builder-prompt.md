@@ -4,6 +4,8 @@ Implement the product-specific experience described by the supplied ProductSpec 
 
 The deterministic compiler has already materialized infrastructure and typed interfaces. You may read the entire generated app, but you may write or edit only the AGENT-owned files listed in BuildPlan. Do not request new dependencies, change configuration, edit system modules, or write runner artifacts.
 
+The complete interpretation and build may use at most 16 provider responses. Batch independent reads into one tool call, then write the four AGENT-owned files directly. Avoid post-write rereading or cosmetic polishing; deterministic verification will provide targeted failure evidence if repair is needed.
+
 Required work:
 
 1. Implement all IMPLEMENT requirements and no PROPOSE or EXCLUDE requirements.

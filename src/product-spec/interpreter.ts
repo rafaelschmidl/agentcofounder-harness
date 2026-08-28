@@ -109,6 +109,7 @@ export async function runProductSpecInterpretation(
     files.stderr,
     timeoutMs,
     environment,
+    16,
   );
 
   let candidate: unknown;

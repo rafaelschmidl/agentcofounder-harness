@@ -238,6 +238,7 @@ async function main(): Promise<void> {
     builderStderr,
     remainingTime(),
     builderEnvironment,
+    Math.max(1, 16 - interpretation.command.modelCalls),
   );
   if (builder.exitCode !== 0) {
     await trace.record("customization", "failed", "The constrained builder did not complete.", {
