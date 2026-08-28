@@ -9,6 +9,14 @@ const ANSI_ESCAPE = /\u001b\[[0-9;]*m/gu;
 export interface RepairDiagnosis {
   key: string;
   evidence: string;
+  stage: "build" | "tests" | "startup" | "unknown";
+  permittedPaths: string[];
+}
+
+const AGENT_PATH_PATTERN = /\b(src\/product\/(?:App\.tsx|domain\.ts|product\.test\.tsx|styles\.css))(?=[():\s]|$)/gu;
+
+function agentPaths(content: string): string[] {
+  return [...new Set([...content.matchAll(AGENT_PATH_PATTERN)].map((match) => match[1]!))].sort();
 }
 
 async function readLogTail(file: string): Promise<string> {
@@ -56,11 +64,43 @@ export async function collectRepairDiagnosis(
     ["production build", "app-build.log"],
     ["development startup", "app-dev.log"],
   ] as const;
-  const entries = await Promise.all(logs.map(
-    async ([label, filename]) => `## ${label}\n\n${await readLogTail(path.join(verificationDirectory, filename))}`,
+  const rawLogs = await Promise.all(logs.map(
+    async ([label, filename]) => ({ label, content: await readLogTail(path.join(verificationDirectory, filename)) }),
   ));
   const testFailures = await readTestFailures(path.join(verificationDirectory, "app-test-results.json"));
-  const evidence = [`## Failed test assertions\n\n${testFailures}`, ...entries]
+  const buildLog = rawLogs.find((entry) => entry.label === "production build")?.content ?? "";
+  const testLog = rawLogs.find((entry) => entry.label === "product tests")?.content ?? "";
+  const startupLog = rawLogs.find((entry) => entry.label === "development startup")?.content ?? "";
+  const buildPaths = /error TS\d+/u.test(buildLog) ? agentPaths(buildLog) : [];
+  const assertionPaths = agentPaths(testFailures);
+  const testPaths = assertionPaths.length > 0 ? assertionPaths : agentPaths(testLog);
+  const startupPaths = agentPaths(startupLog);
+  const stage = buildPaths.length > 0
+    ? "build"
+    : testFailures !== "(no failed assertions in JSON report)" && testFailures !== "(test result JSON unavailable)"
+      ? "tests"
+      : startupPaths.length > 0
+        ? "startup"
+        : "unknown";
+  const permittedPaths = stage === "build"
+    ? buildPaths
+    : stage === "tests"
+      ? testPaths
+      : stage === "startup"
+        ? startupPaths
+        : ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx"];
+  const relevantEvidence = stage === "build"
+    ? `## Production build failures\n\n${buildLog}`
+    : stage === "tests"
+      ? `## Failed test assertions\n\n${testFailures}\n\n## Product test log\n\n${testLog}`
+      : stage === "startup"
+        ? `## Development startup failures\n\n${startupLog}`
+        : rawLogs.map(({ label, content }) => `## ${label}\n\n${content}`).join("\n\n");
+  const evidence = [
+    `## Repair stage\n\n${stage}`,
+    `## Permitted repair paths\n\n${permittedPaths.map((candidate) => `- ${candidate}`).join("\n")}`,
+    relevantEvidence,
+  ]
     .join("\n\n")
     .replaceAll(outputDirectory, "<generated-app>");
   const signature = evidence
@@ -72,5 +112,7 @@ export async function collectRepairDiagnosis(
   return {
     key: createHash("sha256").update(signature || evidence).digest("hex"),
     evidence,
+    stage,
+    permittedPaths,
   };
 }

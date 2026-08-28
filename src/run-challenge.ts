@@ -339,6 +339,7 @@ async function main(): Promise<void> {
       const repairStderr = path.join(repairDirectory, "pi.stderr.log");
       const repairEnvironment = await createPiEnvironment(repairDirectory, {
         SYSTEM_V0_OWNERSHIP_FILE: path.join(outputDirectory, "file_ownership.json"),
+        SYSTEM_V0_PERMITTED_PATHS: JSON.stringify(diagnosis.permittedPaths),
       });
       await trace.record("repair", "started", `Started diagnosed repair attempt ${repairAttempt}.`, {
         attempt: repairAttempt,
@@ -353,6 +354,7 @@ async function main(): Promise<void> {
           repairPrompts.appContext,
           repairDirectory,
           repairAttempt,
+          diagnosis.permittedPaths,
         ),
         outputDirectory,
         repairEvents,
@@ -360,7 +362,7 @@ async function main(): Promise<void> {
         remainingTime(),
         repairEnvironment,
         remainingCalls,
-        2,
+        Math.min(2, diagnosis.permittedPaths.length),
       );
       stageEventFiles.push(repairEvents);
       customizationExitCode = repair.exitCode;

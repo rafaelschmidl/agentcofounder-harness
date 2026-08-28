@@ -15,7 +15,7 @@ import { contentHash } from "../src/build-plan/hash.js";
 import { linkBuildPlan, materializeBuildPlan } from "../src/build-plan/materialize.js";
 import { validateBuildPlan } from "../src/build-plan/validate.js";
 import type { ProductSpec } from "../src/product-spec/types.js";
-import { mayAgentWrite } from "../solution/extensions/owned-paths.js";
+import { mayAgentWrite, mayWritePermittedPath } from "../solution/extensions/owned-paths.js";
 import { validProductSpec } from "./fixtures/product-spec.js";
 
 const temporaryDirectories: string[] = [];
@@ -147,6 +147,8 @@ describe("deterministic BuildPlan compiler", () => {
     expect(mayAgentWrite("/tmp/app", plan.file_ownership, "src/system/repository.ts")).toBe(false);
     expect(mayAgentWrite("/tmp/app", plan.file_ownership, "../outside.ts")).toBe(false);
     expect(mayAgentWrite("/tmp/app", plan.file_ownership, "report.partial.json")).toBe(false);
+    expect(mayWritePermittedPath("src/product/domain.ts", ["src/product/domain.ts"])).toBe(true);
+    expect(mayWritePermittedPath("src/product/App.tsx", ["src/product/domain.ts"])).toBe(false);
   });
 
   it("configures the builder for owned writes without read, shell, or package-install access", () => {
@@ -247,11 +249,21 @@ describe("deterministic BuildPlan compiler", () => {
     await writeFile(path.join(directory, "src/product/domain.ts"), "export const broken = true;\n", "utf8");
 
     const prompts = await loadRepairPrompts(directory, plan, "error TS9999 in src/product/domain.ts");
-    const args = buildRepairPiArguments(spec, plan, prompts.systemPrompt, prompts.appContext, directory, 1);
+    const args = buildRepairPiArguments(
+      spec,
+      plan,
+      prompts.systemPrompt,
+      prompts.appContext,
+      directory,
+      1,
+      ["src/product/domain.ts"],
+    );
 
     expect(prompts.appContext).toContain("export const broken = true");
     expect(prompts.appContext).toContain("error TS9999");
     expect(args[args.indexOf("--tools") + 1]).toBe("write");
     expect(args.at(-1)).toContain("Repair attempt 1");
+    expect(args.at(-1)).toContain("src/product/domain.ts");
+    expect(args.at(-1)).not.toContain('"source_fragments"');
   });
 });

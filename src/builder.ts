@@ -68,15 +68,31 @@ export function buildRepairPiArguments(
   appContext: string,
   artifactDirectory: string,
   attempt: number,
+  permittedPaths: readonly string[] = AGENT_PRODUCT_PATHS,
 ): string[] {
-  return buildBuilderPiArguments(
-    spec,
-    plan,
-    systemPrompt,
-    appContext,
-    artifactDirectory,
-    `Repair attempt ${attempt}: address only the supplied failure evidence, then stop.`,
-  );
+  const provider = providerFromEnvironment();
+  const requirements = spec.requirements
+    .filter((requirement) => requirement.disposition === "IMPLEMENT")
+    .map((requirement) => `- ${requirement.id}: ${requirement.title}`)
+    .join("\n");
+  return [
+    "--mode", "json", "--print", "--offline", "--no-extensions", "--no-skills",
+    "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", "write",
+    "--system-prompt", `${systemPrompt.trim()}\n\n${appContext.trim()}`,
+    "--session-dir", path.join(artifactDirectory, "sessions"),
+    "--extension", path.join(REPOSITORY_ROOT, "solution", "extensions", "owned-paths.ts"),
+    ...providerPiArguments(provider.provider, provider.model),
+    "--thinking", builderThinkingFromEnvironment(),
+    [
+      `Repair attempt ${attempt}.`,
+      `Product: ${spec.product.summary}`,
+      "Implemented requirements:",
+      requirements,
+      "Deterministically permitted paths:",
+      permittedPaths.map((candidate) => `- ${candidate}`).join("\n"),
+      "Address only the supplied failure evidence, then stop.",
+    ].join("\n"),
+  ];
 }
 
 export async function loadBuilderPrompts(
