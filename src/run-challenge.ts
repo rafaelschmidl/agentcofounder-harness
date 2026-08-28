@@ -3,7 +3,12 @@ import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prepareOutput } from "./prepare-output.js";
-import { buildBuilderPiArguments, loadBuilderPrompts } from "./builder.js";
+import {
+  buildBuilderPiArguments,
+  buildRepairPiArguments,
+  loadBuilderPrompts,
+  loadRepairPrompts,
+} from "./builder.js";
 import { compileProductSpec } from "./build-plan/compile.js";
 import {
   linkBuildPlan,
@@ -15,6 +20,7 @@ import { createPiEnvironment } from "./pi-environment.js";
 import { runPi } from "./pi-runner.js";
 import { runProductSpecInterpretation } from "./product-spec/interpreter.js";
 import { auditAppPortAfterPi } from "./port-owner.js";
+import { collectRepairDiagnosis, MAX_REPAIR_CYCLES } from "./repair.js";
 import {
   composeResult,
   missingRequiredResultPaths,
@@ -258,8 +264,101 @@ async function main(): Promise<void> {
       stopped_after_owned_writes: builder.toolLimitReached,
     });
   }
+  const stageEventFiles = [interpretation.files.events, builderEvents];
+  let customizationExitCode = builder.exitCode;
+  let runTimedOut = interpretation.command.timedOut || builder.timedOut;
   await linkBuildPlan(plan, spec, outputDirectory);
   await trace.record("linking", "completed", "Deterministic routes, exports, and entry points were linked.");
+
+  let verification = unavailableAppVerification("Pi did not complete with audited model usage");
+  if (builder.exitCode === 0) {
+    const diagnosisKeys = new Set<string>();
+    for (let attempt = 0; attempt <= MAX_REPAIR_CYCLES; attempt += 1) {
+      const verificationDirectory = path.join(artifactDirectory, "verification", `attempt-${attempt}`);
+      await mkdir(verificationDirectory, { recursive: true });
+      await trace.record("verification", "started", `Started generated application verification attempt ${attempt}.`);
+      verification = await verifyGeneratedApp(outputDirectory, verificationDirectory, { displayRoot: REPOSITORY_ROOT });
+      await trace.record(
+        "verification",
+        verification.passed ? "completed" : "failed",
+        verification.passed
+          ? `Verification attempt ${attempt} passed.`
+          : `Verification attempt ${attempt} produced targeted failure evidence.`,
+        { attempt, checks: verification.checks },
+      );
+      if (verification.passed || attempt === MAX_REPAIR_CYCLES) break;
+
+      const diagnosis = await collectRepairDiagnosis(verificationDirectory, outputDirectory);
+      if (diagnosisKeys.has(diagnosis.key)) {
+        await trace.record("repair", "failed", "Refused a repair with an unchanged diagnosis.", {
+          attempt: attempt + 1,
+          diagnosis_key: diagnosis.key,
+        });
+        break;
+      }
+      diagnosisKeys.add(diagnosis.key);
+      const priorEvents = (await Promise.all(stageEventFiles.map((file) => readFile(file, "utf8")))).join("");
+      const remainingCalls = 16 - collectUsageFromJsonLines(priorEvents).model_calls;
+      if (remainingCalls < 1) {
+        await trace.record("repair", "failed", "No provider responses remained for diagnosed repair.", {
+          attempt: attempt + 1,
+          diagnosis_key: diagnosis.key,
+        });
+        break;
+      }
+
+      const repairAttempt = attempt + 1;
+      const repairDirectory = path.join(artifactDirectory, "repairs", `attempt-${repairAttempt}`);
+      await mkdir(repairDirectory, { recursive: true });
+      const repairPrompts = await loadRepairPrompts(outputDirectory, plan, diagnosis.evidence);
+      const repairEvents = path.join(repairDirectory, "events.jsonl");
+      const repairStderr = path.join(repairDirectory, "pi.stderr.log");
+      const repairEnvironment = await createPiEnvironment(repairDirectory, {
+        SYSTEM_V0_OWNERSHIP_FILE: path.join(outputDirectory, "file_ownership.json"),
+      });
+      await trace.record("repair", "started", `Started diagnosed repair attempt ${repairAttempt}.`, {
+        attempt: repairAttempt,
+        diagnosis_key: diagnosis.key,
+        remaining_model_calls: remainingCalls,
+      });
+      const repair = await runPi(
+        buildRepairPiArguments(
+          spec,
+          plan,
+          repairPrompts.systemPrompt,
+          repairPrompts.appContext,
+          repairDirectory,
+          repairAttempt,
+        ),
+        outputDirectory,
+        repairEvents,
+        repairStderr,
+        remainingTime(),
+        repairEnvironment,
+        remainingCalls,
+        2,
+      );
+      stageEventFiles.push(repairEvents);
+      customizationExitCode = repair.exitCode;
+      runTimedOut ||= repair.timedOut;
+      await trace.record(
+        "repair",
+        repair.exitCode === 0 ? "completed" : "failed",
+        repair.exitCode === 0
+          ? `Diagnosed repair attempt ${repairAttempt} completed.`
+          : `Diagnosed repair attempt ${repairAttempt} did not complete.`,
+        {
+          attempt: repairAttempt,
+          diagnosis_key: diagnosis.key,
+          exit_code: repair.exitCode,
+          successful_owned_writes: repair.successfulToolCalls,
+        },
+      );
+      await linkBuildPlan(plan, spec, outputDirectory);
+      await trace.record("linking", "completed", `Relinked after repair attempt ${repairAttempt}.`);
+      if (repair.exitCode !== 0) break;
+    }
+  }
 
   const portReclamation = await auditAppPortAfterPi(APP_PORT, outputDirectory, appPortHadListenerBeforePi);
   if (portReclamation.listener_after_pi) {
@@ -269,33 +368,16 @@ async function main(): Promise<void> {
   }
 
   const eventFile = path.join(artifactDirectory, "events.jsonl");
-  const eventContent = [
-    await readFile(interpretation.files.events, "utf8"),
-    await readFile(builderEvents, "utf8"),
-  ].join("");
+  const eventContent = (await Promise.all(stageEventFiles.map((file) => readFile(file, "utf8")))).join("");
   await writeFile(eventFile, eventContent, { encoding: "utf8", flag: "wx" });
   const usage = collectUsageFromJsonLines(eventContent);
   const responseLimitPassed = usage.model_calls <= 16 && usage.call_log.every((call) => call.output_tokens <= 4_096);
   const piExitCode = interpretation.command.exitCode !== 0
     ? interpretation.command.exitCode
-    : builder.exitCode !== 0 || !responseLimitPassed
-      ? (builder.exitCode || 1)
+    : customizationExitCode !== 0 || !responseLimitPassed
+      ? (customizationExitCode || 1)
       : 0;
-  const canVerifyApp = piExitCode === 0 && usage.model_calls > 0;
   const startCommand = rootStartCommand(REPOSITORY_ROOT, outputDirectory);
-  let verification = unavailableAppVerification(
-    canVerifyApp ? "app verification had not completed" : "Pi did not complete with audited model usage",
-  );
-  if (canVerifyApp) {
-    await trace.record("verification", "started", "Started generated application verification.");
-    verification = await verifyGeneratedApp(outputDirectory, artifactDirectory, { displayRoot: REPOSITORY_ROOT });
-    await trace.record(
-      "verification",
-      verification.passed ? "completed" : "failed",
-      verification.passed ? "All harness verification gates passed." : "One or more harness verification gates failed.",
-      { checks: verification.checks },
-    );
-  }
   const partial = productReport(spec, verification);
   await Promise.all([
     writeFile(path.join(outputDirectory, "report.partial.json"), `${JSON.stringify(partial, null, 2)}\n`, "utf8"),
@@ -325,7 +407,7 @@ async function main(): Promise<void> {
   for (const missingResultPath of missingResultPaths) {
     console.error(`Required result destination was not written: ${missingResultPath}`);
   }
-  if (interpretation.command.timedOut || builder.timedOut) {
+  if (runTimedOut) {
     console.error("System v0 exceeded CHALLENGE_TIMEOUT_MS and was terminated.");
   }
   if (runRequiresFailureExit(piExitCode, result.status, missingResultPaths)) process.exitCode = 1;

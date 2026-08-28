@@ -7,6 +7,12 @@ import { providerFromEnvironment, providerPiArguments } from "./provider.js";
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
+const AGENT_PRODUCT_PATHS = [
+  "src/product/domain.ts",
+  "src/product/App.tsx",
+  "src/product/product.test.tsx",
+  "src/product/styles.css",
+] as const;
 export const DEFAULT_BUILDER_THINKING = "off";
 
 export function builderThinkingFromEnvironment(): string {
@@ -19,6 +25,7 @@ export function buildBuilderPiArguments(
   systemPrompt: string,
   appContext: string,
   artifactDirectory: string,
+  taskInstruction = "Implement the AGENT-owned product files now.",
 ): string[] {
   const provider = providerFromEnvironment();
   return [
@@ -49,9 +56,27 @@ export function buildBuilderPiArguments(
       "## Deterministic BuildPlan",
       JSON.stringify(plan, null, 2),
       "",
-      "Implement the AGENT-owned product files now.",
+      taskInstruction,
     ].join("\n"),
   ];
+}
+
+export function buildRepairPiArguments(
+  spec: ProductSpec,
+  plan: BuildPlan,
+  systemPrompt: string,
+  appContext: string,
+  artifactDirectory: string,
+  attempt: number,
+): string[] {
+  return buildBuilderPiArguments(
+    spec,
+    plan,
+    systemPrompt,
+    appContext,
+    artifactDirectory,
+    `Repair attempt ${attempt}: address only the supplied failure evidence, then stop.`,
+  );
 }
 
 export async function loadBuilderPrompts(
@@ -76,5 +101,27 @@ export async function loadBuilderPrompts(
   return {
     systemPrompt,
     appContext: `${appInstructions.trim()}\n\n## Materialized system interfaces\n\n${interfaceContext}`,
+  };
+}
+
+export async function loadRepairPrompts(
+  outputDirectory: string,
+  plan: BuildPlan,
+  diagnosis: string,
+): Promise<{ systemPrompt: string; appContext: string }> {
+  const [base, systemPrompt, agentSources] = await Promise.all([
+    loadBuilderPrompts(outputDirectory, plan),
+    readFile(path.join(REPOSITORY_ROOT, "solution", "repair-prompt.md"), "utf8"),
+    Promise.all(AGENT_PRODUCT_PATHS.map(async (relativePath) => ({
+      relativePath,
+      content: await readFile(path.join(outputDirectory, relativePath), "utf8"),
+    }))),
+  ]);
+  const currentSources = agentSources
+    .map(({ relativePath, content }) => `### ${relativePath}\n\n\`\`\`tsx\n${content.trim()}\n\`\`\``)
+    .join("\n\n");
+  return {
+    systemPrompt,
+    appContext: `${base.appContext}\n\n## Current AGENT-owned sources\n\n${currentSources}\n\n## Deterministic failure evidence\n\n${diagnosis}`,
   };
 }

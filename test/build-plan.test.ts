@@ -3,7 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildBuilderPiArguments, builderThinkingFromEnvironment, loadBuilderPrompts } from "../src/builder.js";
+import {
+  buildBuilderPiArguments,
+  buildRepairPiArguments,
+  builderThinkingFromEnvironment,
+  loadBuilderPrompts,
+  loadRepairPrompts,
+} from "../src/builder.js";
 import { compileProductSpec } from "../src/build-plan/compile.js";
 import { contentHash } from "../src/build-plan/hash.js";
 import { linkBuildPlan, materializeBuildPlan } from "../src/build-plan/materialize.js";
@@ -228,5 +234,23 @@ describe("deterministic BuildPlan compiler", () => {
       ok: false,
       code: "invalid",
     });
+  });
+
+  it("supplies current owned sources and targeted evidence to a constrained repair role", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "builder-repair-context-"));
+    temporaryDirectories.push(directory);
+    const spec = validProductSpec();
+    const plan = compileProductSpec(spec);
+    await writeFile(path.join(directory, "AGENTS.md"), "# Generated app contract\n", "utf8");
+    await materializeBuildPlan(plan, spec, directory);
+    await writeFile(path.join(directory, "src/product/domain.ts"), "export const broken = true;\n", "utf8");
+
+    const prompts = await loadRepairPrompts(directory, plan, "error TS9999 in src/product/domain.ts");
+    const args = buildRepairPiArguments(spec, plan, prompts.systemPrompt, prompts.appContext, directory, 1);
+
+    expect(prompts.appContext).toContain("export const broken = true");
+    expect(prompts.appContext).toContain("error TS9999");
+    expect(args[args.indexOf("--tools") + 1]).toBe("write");
+    expect(args.at(-1)).toContain("Repair attempt 1");
   });
 });
