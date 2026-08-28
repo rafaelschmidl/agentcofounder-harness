@@ -162,7 +162,7 @@ describe("deterministic BuildPlan compiler", () => {
       const args = buildBuilderPiArguments(spec, plan, "Builder prompt", "App context", "/tmp/run");
       expect(args[args.indexOf("--tools") + 1]).toBe("write");
       expect(args[args.indexOf("--tools") + 1]).not.toContain("bash");
-      expect(args[args.indexOf("--thinking") + 1]).toBe("low");
+      expect(args[args.indexOf("--thinking") + 1]).toBe("off");
       expect(args.join(" ")).toContain("owned-paths.ts");
       expect(args.at(-1)).toContain("Validated ProductSpec");
       process.env.CHALLENGE_BUILDER_THINKING = "low";
