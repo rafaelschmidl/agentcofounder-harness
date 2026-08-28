@@ -91,6 +91,39 @@ export function expandProductSpecDraft(
       })
     : draft.conflicts;
 
+  let acceptanceJourneys = draft.acceptance_journeys;
+  if (Array.isArray(requirements) && Array.isArray(acceptanceJourneys)) {
+    const requirementById = new Map(requirements
+      .filter((requirement): requirement is JsonObject => isObject(requirement) && typeof requirement.id === "string")
+      .map((requirement) => [requirement.id as string, requirement]));
+    const journeyById = new Map(acceptanceJourneys
+      .filter((journey): journey is JsonObject => isObject(journey) && typeof journey.id === "string")
+      .map((journey) => [journey.id as string, journey]));
+    const addUnique = (value: unknown, addition: string): string[] => {
+      const values = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+      return values.includes(addition) ? values : [...values, addition];
+    };
+    for (const requirement of requirementById.values()) {
+      const requirementId = requirement.id as string;
+      const journeyIds = Array.isArray(requirement.journey_ids) ? requirement.journey_ids : [];
+      for (const journeyId of journeyIds) {
+        if (typeof journeyId !== "string") continue;
+        const journey = journeyById.get(journeyId);
+        if (journey) journey.requirement_ids = addUnique(journey.requirement_ids, requirementId);
+      }
+    }
+    for (const journey of journeyById.values()) {
+      const journeyId = journey.id as string;
+      const requirementIds = Array.isArray(journey.requirement_ids) ? journey.requirement_ids : [];
+      for (const requirementId of requirementIds) {
+        if (typeof requirementId !== "string") continue;
+        const requirement = requirementById.get(requirementId);
+        if (requirement) requirement.journey_ids = addUnique(requirement.journey_ids, journeyId);
+      }
+    }
+    acceptanceJourneys = [...acceptanceJourneys];
+  }
+
   const requirementIdsByFragment = new Map<string, string[]>();
   if (Array.isArray(requirements)) {
     for (const requirement of requirements) {
@@ -121,6 +154,7 @@ export function expandProductSpecDraft(
     source_fragments: sourceFragments,
     fragment_disposition: fragmentDisposition as ProductSpec["fragment_disposition"],
     requirements: requirements as ProductSpec["requirements"],
+    acceptance_journeys: acceptanceJourneys as ProductSpec["acceptance_journeys"],
     conflicts: conflicts as ProductSpec["conflicts"],
   };
   return { candidate, errors: [] };

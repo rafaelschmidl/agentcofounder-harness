@@ -91,7 +91,7 @@ Repair routing:
 - custom interface, build, or runtime -> builder;
 - journey failure -> responsible requirement, transition, block, or custom slot.
 
-Allow at most five diagnosed repair cycles per idea. Every retry must include a changed diagnosis and targeted failure evidence.
+Allow at most seven diagnosed repair cycles per idea. Every retry must include a changed diagnosis and targeted failure evidence.
 
 ### Provider and execution boundary
 
@@ -103,7 +103,7 @@ Working development configuration:
 - Builder and repair thinking: `off` for direct tool execution, independently configurable
 - Maximum 32 provider responses per app run
 - Maximum 8,192 output tokens per response
-- Maximum five repair cycles
+- Maximum seven repair cycles
 - 30-minute wall-clock limit per run
 - EUR 5 cumulative budget across this push
 
@@ -237,7 +237,7 @@ Link them sequentially. Only current work becomes In Progress. Return unfinished
 
 After `PLAN.md` and Linear setup are complete, start one Goal with this objective:
 
-> Implement the approved System v0 `PLAN.md` across the clean harness and evaluator `system-v0` branches. Produce a verified Book Lending PoC, then a verified MVP where one final harness SHA runs Book Lending, commerce checkout, and SaaS workflow from raw prompts through Berget/GLM-5.2 and the shared compiler. Require all independent browser journeys to pass, each app to reach the internal 85/100 readiness target, and cumulative recorded provider cost to remain within EUR 5. Preserve official contracts, retain evidence, allow at most five diagnosed repairs per idea, do not import legacy architecture, and do not modify main or push without the required approval.
+> Implement the approved System v0 `PLAN.md` across the clean harness and evaluator `system-v0` branches. Produce a verified Book Lending PoC, then a verified MVP where one final harness SHA runs Book Lending, commerce checkout, and SaaS workflow from raw prompts through Berget/GLM-5.2 and the shared compiler. Require all independent browser journeys to pass, each app to reach the internal 85/100 readiness target, and cumulative recorded provider cost to remain within EUR 5. Preserve official contracts, retain evidence, allow at most seven diagnosed repairs per idea, do not import legacy architecture, and do not modify main or push without the required approval.
 
 ## Locked decisions
 

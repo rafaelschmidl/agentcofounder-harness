@@ -113,6 +113,8 @@ describe("ProductSpec interpreter boundary", () => {
         source_refs: conflict.source_refs.map((reference) => reference.fragment_id),
       })),
     };
+    draft.acceptance_journeys[0]!.requirement_ids = [];
+    draft.requirements[1]!.journey_ids = [];
 
     const result = await submitProductSpecDraftCandidate(
       JSON.stringify(draft),
@@ -122,7 +124,9 @@ describe("ProductSpec interpreter boundary", () => {
     );
 
     expect(result.accepted).toBe(true);
-    expect(JSON.parse(await readFile(output, "utf8"))).toEqual(spec);
+    const expected = structuredClone(spec);
+    expected.acceptance_journeys[0]!.requirement_ids = ["req_notes"];
+    expect(JSON.parse(await readFile(output, "utf8"))).toEqual(expected);
   });
 
   it("normalizes explicit negative scope and derives fragment mappings", async () => {
