@@ -33,10 +33,12 @@ describe("ProductSpec interpreter boundary", () => {
       provider: process.env.CHALLENGE_PROVIDER,
       model: process.env.CHALLENGE_MODEL,
       thinking: process.env.CHALLENGE_THINKING,
+      interpreterThinking: process.env.CHALLENGE_INTERPRETER_THINKING,
     };
     delete process.env.CHALLENGE_PROVIDER;
     delete process.env.CHALLENGE_MODEL;
     delete process.env.CHALLENGE_THINKING;
+    delete process.env.CHALLENGE_INTERPRETER_THINKING;
     try {
       const args = buildInterpreterPiArguments(
         SAMPLE_IDEA,
@@ -51,7 +53,7 @@ describe("ProductSpec interpreter boundary", () => {
       expect(args[args.indexOf("--provider") + 1]).toBe("berget");
       expect(args[args.indexOf("--model") + 1]).toBe("berget/zai-org/GLM-5.2");
       expect(args.join(" ")).toContain("@bergetai/pi-provider");
-      expect(args[args.indexOf("--thinking") + 1]).toBe("high");
+      expect(args[args.indexOf("--thinking") + 1]).toBe("low");
       expect(args.join(" ")).not.toContain("protected-paths.ts");
     } finally {
       if (previous.provider === undefined) delete process.env.CHALLENGE_PROVIDER;
@@ -60,6 +62,8 @@ describe("ProductSpec interpreter boundary", () => {
       else process.env.CHALLENGE_MODEL = previous.model;
       if (previous.thinking === undefined) delete process.env.CHALLENGE_THINKING;
       else process.env.CHALLENGE_THINKING = previous.thinking;
+      if (previous.interpreterThinking === undefined) delete process.env.CHALLENGE_INTERPRETER_THINKING;
+      else process.env.CHALLENGE_INTERPRETER_THINKING = previous.interpreterThinking;
     }
   });
 

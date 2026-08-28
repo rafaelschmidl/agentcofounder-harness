@@ -10,6 +10,13 @@ import { validateProductSpec } from "./validate.js";
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "../..");
+export const DEFAULT_INTERPRETER_THINKING = "low";
+
+export function interpreterThinkingFromEnvironment(): string {
+  return process.env.CHALLENGE_INTERPRETER_THINKING
+    ?? process.env.CHALLENGE_THINKING
+    ?? DEFAULT_INTERPRETER_THINKING;
+}
 
 export interface ProductSpecInterpretationResult {
   command: CommandResult;
@@ -53,7 +60,7 @@ export function buildInterpreterPiArguments(
     path.join(REPOSITORY_ROOT, "solution", "extensions", "product-spec-interpreter.ts"),
     ...providerPiArguments(provider.provider, provider.model),
     "--thinking",
-    provider.thinking,
+    interpreterThinkingFromEnvironment(),
     [
       "## Raw product idea",
       idea,
