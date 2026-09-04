@@ -173,7 +173,28 @@ function materializedInterfaceContext(relativePath: string, source: string): str
   if (errors.length > 0) {
     throw new Error(`Cannot describe ${relativePath}: ${errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, " ")).join("; ")}`);
   }
-  return `// Public declarations generated from the installed helper; implementation is already materialized.\n${declaration.outputText}`;
+  const editorContract = relativePath === "src/system/collection-controller.tsx"
+    ? collectionEditorContext(source, relativePath) : "";
+  return `// Public declarations generated from the installed helper; implementation is already materialized.\n${declaration.outputText}${editorContract}`;
+}
+
+function collectionEditorContext(source: string, filename: string): string {
+  const file = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const functions = file.statements.filter(ts.isFunctionDeclaration);
+  const editor = functions.find((node) => node.name?.text === "CollectionEditor");
+  const controller = functions.find((node) => node.name?.text === "useCollection");
+  const actions: ts.PropertyAssignment[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isPropertyAssignment(node) && node.name.getText(file) === "act") actions.push(node);
+    ts.forEachChild(node, visit);
+  };
+  if (controller) visit(controller);
+  if (!editor?.body || actions.length !== 1) {
+    throw new Error(`Cannot describe ${filename}: expected CollectionEditor and one controller.act implementation`);
+  }
+  return `\n// Actual installed editor rendering and action entry. ProductEditor delegates to CollectionEditor.\n`
+    + `// Form accessible names, headings, submit labels and input/no-input action behavior are defined here.\n`
+    + `${editor.getText(file)}\n\n// CollectionController member (context excerpt):\n${actions[0]!.getText(file)}\n`;
 }
 
 export async function loadRepairPrompts(

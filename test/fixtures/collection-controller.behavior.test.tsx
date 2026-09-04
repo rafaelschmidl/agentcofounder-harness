@@ -39,6 +39,26 @@ async function create(user: ReturnType<typeof userEvent.setup>, title: string) {
 }
 
 describe("actual materialized collection controller", () => {
+  it("exposes exact create, edit and action form names and commits input-free actions without a form", async () => {
+    const user = userEvent.setup(); render(<TestApp />);
+    await user.click(screen.getByRole("button", { name: "New record" }));
+    const createForm = screen.getByRole("form", { name: "Add record" });
+    await user.type(within(createForm).getByLabelText("Title"), "Exact title");
+    await user.click(within(createForm).getByRole("button", { name: "Add record" }));
+    await user.click(screen.getByRole("button", { name: "Edit Exact title" }));
+    const editForm = screen.getByRole("form", { name: "Edit record" });
+    await user.click(within(editForm).getByRole("button", { name: "Save changes" }));
+    await user.click(screen.getByRole("button", { name: "Lend Exact title" }));
+    const actionForm = screen.getByRole("form", { name: "Lend: Exact title" });
+    await user.type(within(actionForm).getByLabelText("Borrower"), "Jo");
+    await user.click(within(actionForm).getByRole("button", { name: "Lend" }));
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Return Exact title" }));
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "Exact title" })).toHaveTextContent("available");
+    expect(screen.getByRole("status")).toHaveTextContent("Returned.");
+  });
+
   it("keeps invalid drafts, creates and reloads records, and remounts when the selected editor changes", async () => {
     const user = userEvent.setup(); const view = render(<TestApp />);
     await user.click(screen.getByRole("button", { name: "New record" }));

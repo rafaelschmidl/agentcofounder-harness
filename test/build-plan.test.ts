@@ -17,6 +17,7 @@ import { validateBuildPlan } from "../src/build-plan/validate.js";
 import type { ProductSpec } from "../src/product-spec/types.js";
 import { mayAgentWrite, mayWritePermittedPath } from "../solution/extensions/owned-paths.js";
 import { validProductSpec } from "./fixtures/product-spec.js";
+import { publicCollectionSpec } from "./fixtures/executable-collection.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -283,8 +284,36 @@ describe("deterministic BuildPlan compiler", () => {
     expect(helperContext).toContain("declare function prepareCollectionAction");
     expect(helperContext).toContain("futureOption?: string");
     expect(helperContext).toContain("declare function futureCollectionHelper(value: string): string");
-    expect(helperContext).not.toContain("canonical.current");
+    expect(helperContext).toContain("export function CollectionEditor");
+    expect(helperContext).toContain("if (action.fields?.length)");
+    expect(helperContext).not.toContain("const [records, setRecords]");
     expect(helperContext).not.toContain("value.trim()");
+  });
+
+  it.each([false, true])("supplies actual editor names and action entry to both generation and repair (compiled=%s)", async (compiled) => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "editor-accessible-contract-"));
+    temporaryDirectories.push(directory);
+    const spec = compiled ? publicCollectionSpec("book") : validProductSpec();
+    const plan = compileProductSpec(spec, { executableCollection: compiled });
+    await writeFile(path.join(directory, "AGENTS.md"), "# Generated app contract\n");
+    await materializeBuildPlan(plan, spec, directory);
+    const helper = path.join(directory, "src/system/collection-controller.tsx");
+    // An installed helper change must automatically reach every model stage.
+    const source = (await readFile(helper, "utf8")).replaceAll('"Add " + definition.noun', '"Create " + definition.noun');
+    await writeFile(helper, source);
+    const generated = await loadBuilderPrompts(directory, plan);
+    const repaired = await loadRepairPrompts(directory, plan, "Selector mismatch", ["src/product/App.tsx", "src/product/product.test.tsx"]);
+    for (const { appContext } of [generated, repaired]) {
+      const context = appContext.split("### src/system/collection-controller.tsx")[1]!.split("### ")[0]!;
+      expect(context).toContain(source.slice(source.indexOf("export function CollectionEditor" )).trim());
+      expect(context).toContain('action.label + ": " + selected?.[definition.titleKey]');
+      expect(context).toContain('title={title} ariaLabel={title}');
+      expect(context).toContain('"Save changes" : "Create " + definition.noun');
+      expect(context).toContain('if (action.fields?.length)');
+      expect(context).toContain('prepareCollectionAction(definition, actionId, current, {})');
+      expect(context).not.toContain('"Add " + definition.noun');
+      if (compiled) expect(appContext).toContain('return createElement(CollectionEditor, { ...props, definition });');
+    }
   });
 
   it("materializes rollback-safe, idempotent commerce primitives", async () => {

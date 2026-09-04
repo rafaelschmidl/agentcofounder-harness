@@ -23,7 +23,7 @@ describe("materialized collection controller", () => {
       const reportPath = path.join(directory, "controller-results.json");
       await run(process.execPath, [path.join(seed, "node_modules/vitest/vitest.mjs"), "run", "src/test/collection-controller.behavior.test.tsx", "--reporter=json", `--outputFile=${reportPath}`], { cwd: directory, timeout: 12_000 });
       const report = JSON.parse(await readFile(reportPath, "utf8")) as { numPassedTests: number; numFailedTests: number };
-      expect(report.numPassedTests).toBe(7);
+      expect(report.numPassedTests).toBe(8);
       expect(report.numFailedTests).toBe(0);
       await run(process.execPath, [path.join(seed, "node_modules/typescript/bin/tsc"), "--noEmit"], { cwd: directory, timeout: 12_000 })
         .catch((error: { stdout?: string; stderr?: string }) => { throw new Error(`Materialized controller typecheck failed:\n${error.stdout ?? ""}${error.stderr ?? ""}`); });
