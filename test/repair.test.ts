@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { collectRepairDiagnosis, MAX_REPAIR_CYCLES } from "../src/repair.js";
+import { collectRepairDiagnosis, hasCompletedRepairResponse, MAX_REPAIR_CYCLES } from "../src/repair.js";
 
 const directories: string[] = [];
 
@@ -11,6 +11,20 @@ afterEach(async () => {
 });
 
 describe("diagnosed repair", () => {
+  it("leaves an unattempted diagnosis retryable after setup or transport failures", () => {
+    const event = (stopReason: string) => JSON.stringify({ type: "message_end", message: { role: "assistant", stopReason } });
+    expect(hasCompletedRepairResponse("")).toBe(false);
+    expect(hasCompletedRepairResponse("provider startup failed\n")).toBe(false);
+    expect(hasCompletedRepairResponse(event("error"))).toBe(false);
+    expect(hasCompletedRepairResponse(event("aborted"))).toBe(false);
+    expect(hasCompletedRepairResponse(JSON.stringify({ type: "message_start", message: { role: "assistant" } }))).toBe(false);
+    // A genuine no-op response still exhausts the unchanged diagnosis. A transport
+    // error earlier in the same stage does not hide a completed retry.
+    for (const reason of ["stop", "toolUse", "length"]) {
+      expect(hasCompletedRepairResponse(`${event("error")}\n${event(reason)}`)).toBe(true);
+    }
+  });
+
   it("bounds repair cycles and hashes normalized verification evidence", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "repair-diagnosis-"));
     directories.push(directory);
