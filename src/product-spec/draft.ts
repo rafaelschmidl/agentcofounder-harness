@@ -1,4 +1,5 @@
 import { hashIdea } from "./fragments.js";
+import { expandCollectionExecutionDraft } from "./execution-draft.js";
 import type { ProductSpec, SourceFragment, SourceReference } from "./types.js";
 
 type JsonObject = Record<string, unknown>;
@@ -166,6 +167,7 @@ export function expandProductSpecDraft(
       : disposition)
     : draft.fragment_disposition;
 
+  const collectionExecution = expandCollectionExecutionDraft(draft.collection_execution, draft.entities, errors);
   if (errors.length > 0) return { errors };
   const candidate: ProductSpec = {
     ...(draft as unknown as ProductSpec),
@@ -176,6 +178,7 @@ export function expandProductSpecDraft(
     requirements: requirements as ProductSpec["requirements"],
     acceptance_journeys: acceptanceJourneys as ProductSpec["acceptance_journeys"],
     conflicts: conflicts as ProductSpec["conflicts"],
+    ...(Object.hasOwn(draft, "collection_execution") ? { collection_execution: collectionExecution as NonNullable<ProductSpec["collection_execution"]> } : {}),
   };
   return { candidate, errors: [] };
 }

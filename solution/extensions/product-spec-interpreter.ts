@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { COLLECTION_EXECUTION_SCHEMA } from "../../src/executable-collection/schema.js";
+import { collectionExecutionDraftSchema } from "../../src/product-spec/execution-draft.js";
 import { executableCollectionEnabled } from "../../src/executable-collection/types.js";
 import { appendPatternRetrievalAudit } from "../../src/patterns/audit.js";
 import { retrievePatterns } from "../../src/patterns/catalog.js";
@@ -50,7 +50,7 @@ export function productSpecDraftSchema(): Record<string, unknown> {
   delete schema.$id;
   schema.title = "Compact ProductSpec semantic draft";
   if (executableCollectionEnabled()) {
-    schema.properties.collection_execution = COLLECTION_EXECUTION_SCHEMA;
+    schema.properties.collection_execution = collectionExecutionDraftSchema();
     schema.required.push("collection_execution");
   }
   return schema;
