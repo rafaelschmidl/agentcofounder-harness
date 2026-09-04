@@ -11,19 +11,21 @@ Both local `main` branches matched GitHub `origin/main` on September 4 before pr
 | Harness | `699db08132bb0116c3b54f482398704d8cff9974` |
 | Evaluator | `70de1e05222909d245f8009d71c5c8de27271e37` |
 
-Each repository now has a local `final-push/2026-09-04` branch and the local annotated tag `mvp-before-final-push-2026-09-04`. The two repositories remain independent. Keep the parent workspace unversioned. Preserve legacy branches/remotes and the retained MVP evidence.
+Each repository uses `final-push/2026-09-04` for today's integration work and has the local annotated tag `mvp-before-final-push-2026-09-04`. Rafael authorized committing and pushing milestones to the existing GitHub origins so Jones can join this afternoon. The two repositories remain independent. Keep the parent workspace unversioned. Preserve legacy branches/remotes and the retained MVP evidence.
 
 The [organizer register and strategy assessment](assessment-2026-09-04.md) records sources and unresolved constraints. Latest applicable organizer Slack clarifications take precedence over older website text, within the scope of each reply. Speed is unscored; an unlimited generation timeout is not established. The old root `PLAN.md` is the historical August MVP plan, including its historical budget and branch instructions.
 
 ## Git and ownership
 
-- Work locally on the final-push branches. Use one writer per file area; parallelize harness, independent evaluation, and release documentation when their edits do not overlap. Use a separate temporary worktree only for a conflicting or risky experiment.
+- Work locally on the final-push branches. Keep `main` at the known MVP until the verified candidate is selected for final delivery. Use one writer per file area; parallelize harness and independent evaluation when their edits do not overlap. Use a separate temporary worktree only for a conflicting or risky experiment.
 - Make a local commit after each coherent, meaningfully verified milestone. Include its Linear identifier in the message. Avoid accumulating a day of uncommitted changes.
 - A paid evaluation uses a resolved committed harness SHA from `git archive`, never the live working tree. Record the evaluator SHA alongside it. Commit local experimental candidates when they need evaluation; an experimental commit is not a release endorsement.
-- Keep experiments local until their result is understood. Push useful, verified milestones for collaborator access or remote backup after the user has approved the concrete destination/ref/change range. Once a bounded push policy is approved, operate within it without asking repeatedly. No push policy has been accepted in this setup turn.
-- Fetch remote state before any approved push or integration. Never force-push shared history. Preserve a collaborator's new changes and reconcile them explicitly. Promote a verified candidate to `main` through a normal integration only when authorized. Use a PR if it adds review value; do not require one for every local checkpoint.
+- Keep incomplete or inconclusive experiments local. Push coherent, verified milestones to `origin/final-push/2026-09-04` in the existing harness/evaluator repositories. Rafael's authorization covers these commits and pushes without repeated confirmation. Publish the preparation checkpoint first so Jones has the current starting point. Push again after a meaningful improvement, before handing off work, or before a substantial pause; there is no fixed timer or push-per-commit rule.
+- Fetch remote state before pushing or integrating. Never force-push shared history. Preserve a collaborator's new changes and reconcile them explicitly. Promote the selected, verified candidate to `main` through normal integration during final delivery under the accepted plan. Use a PR if it adds review value; do not require one for every local checkpoint.
 - Public visibility, release destination, and form submission need a concrete reviewable package and the user's approval. Prepare that package after candidate selection in the reserved final delivery window. During development, retain run evidence and commit references as part of normal work. The evaluator may remain private. Repository visibility has not changed during setup.
 - Keep credentials, dependency directories, generated working output, raw local evidence, and OS metadata out of commits. Publish only reviewed, curated evidence. Do not broadly stage the workspace.
+
+When Jones joins, agree his issue and file area before overlapping edits. He should branch from the latest `origin/final-push/2026-09-04` into a short-lived task branch, push his checkpoints there, and hand back the branch with its tests and any remaining limitations. Keep one coordinator integrating changes onto the final-push branch. Merge or cherry-pick the intended commits after focused review, then validate the combined result. Linear records ownership and status; it does not need a ticket for every commit. A milestone handoff should identify the harness SHA, evaluator SHA if changed, what works, and the next useful task.
 
 ## Linear
 
