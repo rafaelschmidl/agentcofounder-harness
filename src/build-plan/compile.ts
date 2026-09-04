@@ -146,6 +146,7 @@ export function compileProductSpec(spec: ProductSpec, options: { executableColle
   const selected = selectedBlockIds(spec, options.executableCollection, options.compiledUiJourneys);
   const agentFiles = AGENT_FILES.filter((file) => !(selected.has("domain.executable-collection") && file === "src/product/domain.ts")
     && !(selected.has("verification.collection-ui") && file === "src/product/product.test.tsx"));
+  if (selected.has("verification.collection-ui")) agentFiles.push("src/product/interaction-manifest.json");
   const blocks = plannedBlocks(spec, selected);
   const implementedRequirements = spec.requirements.filter((requirement) => requirement.disposition === "IMPLEMENT");
   const customSlotId = "custom_product";

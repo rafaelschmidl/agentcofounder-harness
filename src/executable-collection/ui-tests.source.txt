@@ -1,96 +1,84 @@
-// Compiler-owned contract checks. These do not claim prose journey or raw-idea fidelity.
+// Compiler-owned executable interaction tests; original-idea fidelity is independently assessed.
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import App from './App';
-import { matchesGuard, type FlatCollectionContract, type FieldRule, type CollectionValues } from '../system/executable-collection';
-
-const contract: FlatCollectionContract = __COMPILED_CONTRACT__;
-const scenarios: { initial: CollectionValues; paths: { action: string; steps: { action: string; input: CollectionValues; expected: CollectionValues }[] }[] } = __COMPILED_SCENARIOS__;
-function control(selector: string, parent: ParentNode = document.body): HTMLElement {
-  const matches = [...parent.querySelectorAll<HTMLElement>(selector)];
-  expect(matches, 'one unambiguous bound UI control').toHaveLength(1);
-  const element = matches[0];
-  expect(element).toBeVisible(); expect(element).toBeEnabled(); expect(element).toHaveAccessibleName();
-  return element;
+import {matchesGuard} from '../system/executable-collection';
+const contract: any = __COMPILED_CONTRACT__;
+const compiled: any = __COMPILED_MANIFEST__;
+type Values = Record<string,string>;
+type AnyStep = {op:string;[key:string]:any};
+function bound(parent:ParentNode, attribute:string, value:string):HTMLElement[] {
+  return [...parent.querySelectorAll<HTMLElement>('['+attribute+']')].filter(node=>node.getAttribute(attribute)===value);
 }
-function record(): HTMLElement {
-  const records = document.querySelectorAll<HTMLElement>('[data-collection-record]');
-  expect(records).toHaveLength(1);
-  expect(records[0]).toBeVisible(); return records[0];
+function isVisible(node:HTMLElement):boolean { if(!node.isConnected)return false;for(let current:HTMLElement|null=node;current;current=current.parentElement){const style=getComputedStyle(current);if(style.display==='none'||style.visibility==='hidden'||current.hidden)return false;}return true; }
+function visibleText(node:HTMLElement):string { const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text='';for(let child=walker.nextNode();child;child=walker.nextNode())if(child.parentElement&&isVisible(child.parentElement))text+=child.textContent??'';return text.trim(); }
+function control(nodes:HTMLElement[],allowEquivalent=false):HTMLElement {
+  const visible=nodes.filter(isVisible);if(allowEquivalent)expect(visible.length,'a visible bound control').toBeGreaterThan(0);else expect(visible,'one unambiguous visible bound control').toHaveLength(1);
+  const element=visible[0];expect(element).toBeVisible();expect(element).toBeEnabled();expect(element).toHaveAccessibleName();return element;
 }
-function show(expected: CollectionValues) {
-  const row = record();
-  for (const key of [...contract.fields.map(field => field.key), ...Object.keys(contract.hidden ?? {})]) {
-    const value = expected[key] ?? '';
-    const label = contract.fields.find(field => field.key === key)?.options?.find(option => option.value === value)?.label
-      ?? (value ? value.replace(/_/g, ' ') : '—');
-    const field = row.querySelector<HTMLElement>('[data-collection-field="' + CSS.escape(key) + '"]');
-    expect(field, 'visible value for ' + key).not.toBeNull();
-    expect(field).toBeVisible(); expect(field!.textContent?.trim()).toBe(label);
+function displayed(values:Values,key:string):string {
+  const value=values[key]??'';const rule=compiled.manifest.display?.[key];if(!value)return rule?.empty??'—';
+  const label=rule?.values?.[value]??contract.fields.find((field:any)=>field.key===key)?.options?.find((option:any)=>option.value===value)?.label??value.replace(/_/g,' ');
+  return rule?.format?rule.format.replace('{value}',label):label;
+}
+async function runJourney(steps:AnyStep[]) {
+  const user=userEvent.setup();let view=render(<App/>);const ids:Record<string,string>={};let expected:Record<string,Values>={};
+  const rows=()=>[...document.querySelectorAll<HTMLElement>('[data-collection-record]')].filter(isVisible);
+  const row=(alias:string)=>{const result=bound(document.body,'data-collection-record',ids[alias]).filter(isVisible);expect(result,'visible record '+alias).toHaveLength(1);return result[0];};
+  const button=(name:string,parent:ParentNode=document.body)=>control(bound(parent,'data-collection-control',name),name==='create');
+  async function selectFilter(id:string,value:string){const candidates=bound(document.body,'data-collection-filter',id).filter(isVisible);const select=candidates.find(node=>node instanceof HTMLSelectElement);if(select)await user.selectOptions(control([select]),value);else await user.click(control(candidates.filter(node=>node.getAttribute('data-collection-filter-value')===value)));}
+  async function fill(fields:any[],values:Values){const form=screen.getByRole('form');expect(form).toBeVisible();for(const field of fields){const input=within(form).getByLabelText(field.label,{exact:true});expect(input).toBeVisible();if(field.options)await user.selectOptions(input,values[field.key]??'');else{await user.clear(input);if(values[field.key])await user.type(input,values[field.key]);}}}
+  async function submit(){await user.click(control([...screen.getByRole('form').querySelectorAll<HTMLElement>('button[type="submit"],input[type="submit"]')]));}
+  async function inspect(alias:string,values:Values,keys:string[]){
+    const summary=row(alias);let details:HTMLElement|undefined;let opened=false;
+    for(const key of keys){let fields=bound(summary,'data-collection-field',key).filter(isVisible);
+      if(!fields.length){if(!opened){await user.click(button('inspect',summary));opened=true;details=control(bound(document.body,'data-collection-details',ids[alias]));}fields=bound(details!,'data-collection-field',key).filter(isVisible);}
+      expect(fields,'one visible value for '+key).toHaveLength(1);expect(fields[0]).toBeVisible();expect(visibleText(fields[0])).toBe(displayed(values,key));
+    }
+    for(const action of contract.actions){const available=matchesGuard(action.when,values)&&(!action.source||matchesGuard(action.source,values));if(!available){for(const candidate of [...bound(summary,'data-collection-action',action.id),...(details?bound(details,'data-collection-action',action.id):[])].filter(isVisible))expect(candidate,'unavailable action '+action.id).toBeDisabled();}}
+    if(opened)await user.click(button('close-details',details));
   }
-  for (const action of contract.actions) {
-    const available = matchesGuard(action.when, expected) && (!action.source || matchesGuard(action.source, expected));
-    const selector = '[data-collection-action="' + CSS.escape(action.id) + '"]';
-    if (available) control(selector, row);
-    else for (const node of row.querySelectorAll<HTMLElement>(selector)) expect(node).toBeDisabled();
+  async function mutate(step:AnyStep,next?:Values){
+    if(step.op==='create'){
+      const before=new Set(rows().map(node=>node.getAttribute('data-collection-record')));await user.click(button('create'));await fill(contract.fields,{...Object.fromEntries(contract.fields.map((f:any)=>[f.key,f.initial??''])),...step.values});await submit();
+      const added=rows().filter(node=>!before.has(node.getAttribute('data-collection-record')));expect(added,'exactly one record is visibly created').toHaveLength(1);ids[step.record]=added[0].getAttribute('data-collection-record')!;
+    } else if(step.op==='edit'){await user.click(button('edit',row(step.record)));await fill(contract.fields,next!);await submit();}
+    else if(step.op==='action'){const action=contract.actions.find((action:any)=>action.id===step.action)!;await user.click(control(bound(row(step.record),'data-collection-action',step.action)));if(action.input?.length){await fill(action.input,step.input??{});await submit();}}
+    else if(step.op==='remove'){await user.click(button('remove',row(step.record)));expect(bound(document.body,'data-collection-record',ids[step.record]).filter(isVisible)).toHaveLength(0);}
+    if(next)expected[step.record]=next;else if(step.op==='remove')delete expected[step.record];
+  }
+  for(const step of steps){
+    if(['create','edit','action','remove'].includes(step.op)){await mutate(step,step.expected);continue;}
+    if(step.op==='expect'){await inspect(step.record,step.expected,step.fields);continue;}
+    if(step.op==='reload'){view.unmount();view=render(<App/>);for(const filter of compiled.manifest.filters)await selectFilter(filter.id,'*');continue;}
+    if(step.op==='filter'){
+      await selectFilter(step.filter,step.value);continue;
+    }
+    if(step.op==='visible'){for(const alias of step.visible)expect(bound(document.body,'data-collection-record',ids[alias]).filter(isVisible)).toHaveLength(1);for(const alias of step.absent)expect(bound(document.body,'data-collection-record',ids[alias]).filter(isVisible)).toHaveLength(0);continue;}
+    if(step.op==='count'){const counts=bound(document.body,'data-collection-count',step.counter).filter(isVisible);expect(counts).toHaveLength(1);expect(counts[0]).toBeVisible();expect(visibleText(counts[0])).toBe(String(step.expectedCount));continue;}
+    if(step.op==='invalid_create'){
+      const count=rows().length;await user.click(button('create'));await fill(contract.fields,step.values);await submit();expect(rows()).toHaveLength(count);
+      const label=contract.fields.find((field:any)=>field.key===step.field)!.label;const field=screen.getByLabelText(label,{exact:true});expect(field).toBeVisible();expect(field.getAttribute('aria-invalid')==='true'||field.matches(':invalid')).toBe(true);
+      view.unmount();view=render(<App/>);for(const[alias,values]of Object.entries(expected))await inspect(alias,values,Object.keys(values).filter(key=>key!=='id'));expect(rows()).toHaveLength(count);continue;
+    }
+    if(step.op==='reject_save'){
+      const before=structuredClone(expected);const count=rows().length;const mutation=step.mutation;
+      const save=vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new DOMException('Injected quota failure','QuotaExceededError');});
+      try {
+        // Use visible operations without success-only postconditions: rejection must preserve drafts and records.
+        if(mutation.op==='create'){await user.click(button('create'));await fill(contract.fields,step.expected);await submit();}
+        else if(mutation.op==='edit'){await user.click(button('edit',row(mutation.record)));await fill(contract.fields,step.expected);await submit();}
+        else if(mutation.op==='remove')await user.click(button('remove',row(mutation.record)));
+        else {const action=contract.actions.find((a:any)=>a.id===mutation.action)!;await user.click(control(bound(row(mutation.record),'data-collection-action',mutation.action)));if(action.input?.length){await fill(action.input,mutation.input??{});await submit();}}
+        expect(save.mock.calls.some(args=>args[0]===contract.storageKey),'the canonical save was actually attempted').toBe(true);
+        expect(rows()).toHaveLength(count);expect(screen.getAllByRole('alert').some(isVisible)).toBe(true);
+        for(const[alias,values]of Object.entries(before))await inspect(alias,values,Object.keys(values).filter(key=>key!=='id'));
+      } finally {save.mockRestore();}
+      view.unmount();view=render(<App/>);for(const [alias,values]of Object.entries(before))await inspect(alias,values,Object.keys(values).filter(key=>key!=='id'));
+      expect(rows()).toHaveLength(count);continue;
+    }
+    throw new Error('Uncompiled operator '+step.op);
   }
 }
-async function fill(user: ReturnType<typeof userEvent.setup>, fields: FieldRule[], values: CollectionValues) {
-  const form = screen.getByRole('form'); expect(form).toBeVisible();
-  for (const field of fields) {
-    const input = within(form).getByLabelText(field.label, { exact: true });
-    expect(input).toBeVisible();
-    if (field.options) await user.selectOptions(input, values[field.key]);
-    else { await user.clear(input); if (values[field.key]) await user.type(input, values[field.key]); }
-  }
-}
-async function submit(user: ReturnType<typeof userEvent.setup>) {
-  const form = screen.getByRole('form');
-  await user.click(control('button[type="submit"]', form));
-}
-async function create(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(control('[data-collection-control="create"]'));
-  await fill(user, contract.fields, scenarios.initial); await submit(user); show(scenarios.initial);
-}
-function reload(view: ReturnType<typeof render>) { view.unmount(); return render(<App />); }
-
-it('compiled-contract: visible create, editable fields, delete and reload', async () => {
-  const user = userEvent.setup(); let view = render(<App />); await create(user);
-  view = reload(view); show(scenarios.initial);
-  await user.click(control('[data-collection-control="edit"]', record()));
-  const edited = { ...scenarios.initial };
-  for (const field of contract.fields) edited[field.key] = field.options?.[0]?.value ?? ('Revised ' + field.label);
-  await fill(user, contract.fields, edited); await submit(user); show(edited);
-  view = reload(view); show(edited);
-  await user.click(control('[data-collection-control="remove"]', record()));
-  expect(document.querySelector('[data-collection-record]')).toBeNull();
-  view = reload(view); expect(document.querySelector('[data-collection-record]')).toBeNull();
-});
-
-for (const path of scenarios.paths) it('compiled-contract: canonical transition ' + path.action + ' persists', async () => {
-  const user = userEvent.setup(); let view = render(<App />); await create(user);
-  for (const step of path.steps) {
-    const action = contract.actions.find(action => action.id === step.action)!;
-    await user.click(control('[data-collection-action="' + CSS.escape(step.action) + '"]', record()));
-    if (action.input?.length) { await fill(user, action.input, step.input); await submit(user); }
-    show(step.expected); view = reload(view); show(step.expected);
-  }
-});
-
-for (const required of contract.fields.filter(field => field.required && !field.options)) it('compiled-contract: required ' + required.key + ' rejects an empty create', async () => {
-  const user = userEvent.setup(); render(<App />);
-  await user.click(control('[data-collection-control="create"]'));
-  await fill(user, contract.fields, { ...scenarios.initial, [required.key]: '' }); await submit(user);
-  expect(screen.getByRole('form')).toBeVisible();
-  expect(document.querySelector('[data-collection-record]')).toBeNull();
-  expect(screen.getByLabelText(required.label, { exact: true })).toHaveAttribute('aria-invalid', 'true');
-});
-
-it('compiled-contract: failed persistence preserves visible and reloaded record', async () => {
-  const user = userEvent.setup(); let view = render(<App />); await create(user);
-  const save = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });
-  await user.click(control('[data-collection-control="remove"]', record()));
-  show(scenarios.initial); expect(screen.getByRole('alert')).toBeVisible();
-  save.mockRestore(); view = reload(view); show(scenarios.initial);
-});
+for(const journey of compiled.journeys)it('['+journey.id+'] observed manifest: '+journey.steps.map((step:any)=>step.op).join(' → '),async()=>runJourney(journey.steps),30000);

@@ -1,5 +1,6 @@
-// Semantic bindings only. The product owns elements, composition, names and CSS.
+// Behavioral bindings only; the product owns elements, structure, names and CSS.
 import type { CollectionController, CollectionDefinition, CollectionItem } from './collection-controller';
+import { display } from './collection-ui-config';
 export function collectionUi(controller: CollectionController) {
   return {
     create: () => ({ 'data-collection-control': 'create', onClick: controller.startCreate }),
@@ -8,10 +9,17 @@ export function collectionUi(controller: CollectionController) {
     edit: (record: CollectionItem) => ({ 'data-collection-control': 'edit', onClick: () => controller.startEdit(record) }),
     remove: (record: CollectionItem) => ({ 'data-collection-control': 'remove', onClick: () => controller.remove(record) }),
     action: (record: CollectionItem, id: string) => ({ 'data-collection-action': id, onClick: () => controller.act(record, id) }),
+    inspect: (open: () => void) => ({ 'data-collection-control': 'inspect', onClick: open }),
+    details: (record: CollectionItem) => ({ 'data-collection-details': record.id }),
+    closeDetails: (close: () => void) => ({ 'data-collection-control': 'close-details', onClick: close }),
+    filter: (id: string) => ({ 'data-collection-filter': id }),
+    filterOption: (id: string, value: string) => ({ 'data-collection-filter': id, 'data-collection-filter-value': value }),
+    count: (id: string) => ({ 'data-collection-count': id }),
   };
 }
 export function collectionValue(definition: CollectionDefinition, record: CollectionItem, key: string): string {
-  const value = record[key] ?? '';
-  return definition.fields.find(field => field.key === key)?.options?.find(option => option.value === value)?.label
-    ?? (value ? value.replace(/_/g, ' ') : '—');
+  const value = record[key] ?? ''; const rule = display[key];
+  if (!value) return rule?.empty ?? '—';
+  const label = rule?.values?.[value] ?? definition.fields.find(field=>field.key===key)?.options?.find(option=>option.value===value)?.label ?? value.replace(/_/g,' ');
+  return rule?.format ? rule.format.replace('{value}',label) : label;
 }

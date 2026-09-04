@@ -136,13 +136,15 @@ export async function loadBuilderPrompts(
   plan: BuildPlan,
 ): Promise<{ systemPrompt: string; appContext: string }> {
   const compiledCollection = plan.blocks.some((block) => block.id === "domain.executable-collection");
+  const compiledUi = plan.blocks.some((block) => block.id === "verification.collection-ui");
   const compiledInterfaces = new Set(["src/system/product.ts", "src/system/ui.tsx", "src/system/record-form.tsx", "src/system/collection-controller.tsx", "src/system/test-contract.ts", "src/product/domain.ts"]);
+  if (compiledUi) compiledInterfaces.add("src/system/collection-ui.ts");
   const interfacePaths = plan.file_ownership
     .filter((entry) => entry.owner === "BLOCK" && (compiledCollection ? compiledInterfaces.has(entry.path) : entry.path.startsWith("src/system/")))
     .map((entry) => entry.path)
     .sort();
   const [systemPrompt, appInstructions, interfaces] = await Promise.all([
-    readFile(path.join(REPOSITORY_ROOT, "solution", compiledCollection ? "builder-executable-collection.md" : "builder-prompt.md"), "utf8"),
+    readFile(path.join(REPOSITORY_ROOT, "solution", compiledUi ? "builder-compiled-ui-journeys.md" : compiledCollection ? "builder-executable-collection.md" : "builder-prompt.md"), "utf8"),
     readFile(path.join(outputDirectory, "AGENTS.md"), "utf8"),
     Promise.all(interfacePaths.map(async (relativePath) => ({
       relativePath,
@@ -195,7 +197,9 @@ export async function loadRepairPrompts(
     .map(({ relativePath, content }) => `### ${relativePath}\n\n\`\`\`tsx\n${content.trim()}\n\`\`\``)
     .join("\n\n");
   return {
-    systemPrompt: plan.blocks.some((block) => block.id === "domain.executable-collection")
+    systemPrompt: plan.blocks.some((block) => block.id === "verification.collection-ui")
+      ? `${systemPrompt}\n\nThe interaction manifest and compiled tests are protected once validated. Repair the actual App/CSS against their assertions. When the supplied diagnosis explicitly permits interaction-manifest.json, correct its schema/unsupported operators before it is frozen. Do not fabricate journey tags or edit product.test.tsx.\n\n${base.systemPrompt.replace(/^# [^\n]+\n\n[^\n]+\n\n/u, "")}`
+      : plan.blocks.some((block) => block.id === "domain.executable-collection")
       ? `${systemPrompt}\n\nThe compiled domain.ts is protected. Use its definition, useProductCollection and ProductEditor API. Canonical collection state, persistence and workflow semantics belong to that module; never replace them with an alternate implementation in App. Preserve independent journey assertions when domain semantics are wrong and return control with finish_repair.`
       : systemPrompt,
     appContext: `${base.appContext}\n\n## Current AGENT-owned sources\n\n${currentSources}\n\n## Deterministic failure evidence\n\n${diagnosis}`,

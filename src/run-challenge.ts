@@ -12,6 +12,8 @@ import {
 } from "./builder.js";
 import { compileProductSpec } from "./build-plan/compile.js";
 import { executableCollectionEnabled } from "./executable-collection/types.js";
+import { finalizeUiJourneyFiles, uiJourneysEnabled, type UiCompilation } from "./executable-collection/ui-journeys.js";
+import { UI_MANIFEST_PATH } from "./executable-collection/interaction-manifest.js";
 import {
   linkBuildPlan,
   materializeBuildPlan,
@@ -150,6 +152,7 @@ Environment:
   CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 1800000)
   CHALLENGE_SEMANTIC_REVIEW Set to 1 for an experimental source review after functional checks (default: off)
   CHALLENGE_EXECUTABLE_COLLECTION Set to 1 for experimental compiler-owned collection semantics (default: off)
+  CHALLENGE_COMPILED_UI_JOURNEYS Set to 1 with executable collection for compiled typed interaction tests (default: off)
 `);
 }
 
@@ -318,7 +321,8 @@ async function main(): Promise<void> {
   });
 
   await trace.record("compilation", "started", "Started deterministic ProductSpec compilation.");
-  const plan = compileProductSpec(spec, { executableCollection: executableCollectionEnabled() });
+  const plan = compileProductSpec(spec, { executableCollection: executableCollectionEnabled(),
+    compiledUiJourneys: executableCollectionEnabled() && spec.collection_execution?.mode === "compiled" && process.env.CHALLENGE_COMPILED_UI_JOURNEYS === "1" });
   const planValidation = validateBuildPlan(plan, spec);
   if (!planValidation.valid) {
     await trace.record("compilation", "failed", "BuildPlan validation failed.", { errors: planValidation.errors });
@@ -378,6 +382,7 @@ async function main(): Promise<void> {
   let verification = unavailableAppVerification("Pi did not complete before the run deadline");
   let latestReadySource: SourceCheckpoint | undefined;
   let latestSourceAttempt = 0;
+  let uiCompilation: UiCompilation | undefined;
   // An interrupted response can leave repairable files. Verification, not process exit alone, diagnoses them.
   if (!builder.timedOut) {
     const diagnosisKeys = new Set<string>();
@@ -386,6 +391,8 @@ async function main(): Promise<void> {
       const verificationDirectory = path.join(artifactDirectory, "verification", `attempt-${attempt}`);
       await mkdir(verificationDirectory, { recursive: true });
       await trace.record("verification", "started", `Started generated application verification attempt ${attempt}.`);
+      uiCompilation = await finalizeUiJourneyFiles(plan, spec, outputDirectory);
+      if (uiCompilation) await copyFile(path.join(outputDirectory, "compiled-ui-coverage.json"), path.join(verificationDirectory, "compiled-ui-coverage.json"));
       verification = await verifyGeneratedApp(outputDirectory, verificationDirectory, {
         port: args.verificationPort,
         displayRoot: REPOSITORY_ROOT,
@@ -433,7 +440,20 @@ async function main(): Promise<void> {
       }
       if ((verification.passed && !semanticDiagnosis) || attempt === MAX_REPAIR_CYCLES) break;
 
-      const diagnosis = scopeRepairToOwnership(semanticDiagnosis ?? await diagnoseVerification(verificationDirectory, outputDirectory, verification), plan);
+      if (uiCompilation?.valid && uiCompilation.unsupportedIds.length > 0 && verification.checks.every(check => check.result === "passed")
+        && (verification.journeys ?? []).filter(journey => journey.result !== "passed").every(journey => uiCompilation!.unsupportedIds.includes(journey.id))) {
+        await trace.record("verification", "failed", "Only explicitly unsupported interaction journeys remain uncovered; retain partial evidence without weakening tests.", { unsupported: uiCompilation.unsupportedIds });
+        break;
+      }
+
+      let rawDiagnosis = semanticDiagnosis ?? await diagnoseVerification(verificationDirectory, outputDirectory, verification);
+      if (uiJourneysEnabled(plan) && !semanticDiagnosis) {
+        const permittedPaths = uiCompilation?.valid ? ["src/product/App.tsx", "src/product/styles.css"] : [UI_MANIFEST_PATH, "src/product/App.tsx", "src/product/styles.css"];
+        const evidence = rawDiagnosis.evidence.replace(/## Permitted repair paths\n\n[\s\S]*?(?=\n\n## |$)/u, `## Permitted repair paths\n\n${permittedPaths.map(file => `- ${file}`).join("\n")}`)
+          + `\n\nCompiled interaction tests are immutable. ${uiCompilation?.valid ? "Repair the actual UI against the observed assertions." : `Manifest validation failed: ${uiCompilation?.errors.join("; ")}. Correct the typed manifest; no TSX test source is permitted.`}`;
+        rawDiagnosis = { ...rawDiagnosis, permittedPaths, evidence, key: createHash("sha256").update(`${rawDiagnosis.key}\n${uiCompilation?.errors.join("; ")}\n${permittedPaths.join("\n")}`).digest("hex") };
+      }
+      const diagnosis = scopeRepairToOwnership(rawDiagnosis, plan);
       if (diagnosis.permittedPaths.length === 0) {
         await trace.record("repair", "failed", "Failure is confined to compiler-owned semantics; product code cannot rewrite that contract.", { diagnosis_key: diagnosis.key });
         break;
