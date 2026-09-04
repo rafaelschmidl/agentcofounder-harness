@@ -1,5 +1,6 @@
 /** Offline, domain-neutral defaults. Product styles own the final composition. */
-export const BASE_UI_STYLES = `:root {
+export const BASE_UI_STYLES = `@layer foundation {
+:root {
   --page: #f6f5f1;
   --surface: #ffffff;
   --surface-muted: #efeee9;
@@ -151,5 +152,6 @@ p { margin-bottom: .75rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
 }
 `;
