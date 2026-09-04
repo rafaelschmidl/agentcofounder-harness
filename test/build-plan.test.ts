@@ -150,7 +150,7 @@ describe("deterministic BuildPlan compiler", () => {
     expect(await readFile(path.join(directory, "src/product/styles.css"), "utf8"))
       .toBe(":root { --accent: #263f64; }\n");
     expect(await readFile(path.join(directory, "src/system/collection.ts"), "utf8")).toContain("upsertRecord");
-    expect(await readFile(path.join(directory, "src/test/setup.ts"), "utf8")).toContain("afterEach(cleanup)");
+    expect(await readFile(path.join(directory, "src/test/setup.ts"), "utf8")).toContain("cleanup();");
     expect(await readFile(path.join(directory, "src/system/app-smoke.test.tsx"), "utf8"))
       .toContain("renders the default App without React runtime errors");
     expect(JSON.parse(await readFile(path.join(directory, "build_plan.json"), "utf8"))).toEqual(plan);
