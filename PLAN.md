@@ -1,5 +1,7 @@
 # System v0 PoC-to-MVP Plan
 
+> Historical plan for the August 28–29 MVP, which is complete. Its approval, EUR 5 allowance, and branch instructions describe that campaign. September 4 preparation is documented in [the final-push setup](docs/final-push/setup.md); a new implementation plan and goal still await acceptance.
+
 Status: `APPROVED`
 
 Approved: 2026-08-28
