@@ -79,12 +79,27 @@ The clearest category signals for idea-to-pattern matching are **the object bein
 | `website.strategy.marketplace@1.0.0` | Two-sided marketplace | Let two sides find each other and transact |
 | `website.strategy.community-content@1.0.0` | Community / content platform | Acquire members, publish, engage |
 
-## Live-run quality comparison (task 5.2 — to be filled)
+## Live-run quality comparison (task 5.2)
 
-| Run | Interpreter input tokens | Views/goals quality | Repair cycles | Notes |
-|---|---|---|---|---|
-| pre-change baseline | 40,239 total input (whole run, 2026-09-03) | generic dashboard copy, view purposes invented ad hoc | 6/7 | recorded in docs/component-breakdown.md |
-| post-change Book Lending | _pending_ | _pending_ | _pending_ | _pending_ |
+Baseline: docs/component-breakdown.md, run of 2026-09-03 on Book Lending (`contract-public/development-idea.txt`), pre-change harness.
+
+| Metric | pre-change baseline (2026-09-03) | post-change (2026-09-04, this change) | Delta |
+|---|---|---|---|
+| Status / attempts | success, 1 run used 6/7 repair cycles | success, verified on attempt 1, 0 repair cycles | repair budget freed |
+| Model calls | 16 of 32 | 11 of 32 | −5 calls |
+| Input / output tokens | 40,239 / 13,537 | 7,626 / 21,082 | −81% input, +56% output |
+| Cache read / write | 120,192 / 0 | 117,312 / 0 | ≈ equal |
+| Weighted-token formula | 92,869 | 82,603 | −11% |
+| Pi cost | €0.067 | €0.0498 | −26% |
+| Interpreter first-call input | 3,872 | 1,555 | −60% (E1 evidence) |
+
+Spec-quality observations (post-change run):
+- `product.goals` are framed as user outcomes with counters and correction paths ("Know which books I own at a glance", "See how many books are lent out right now") rather than feature restatements.
+- Views carry explicit purposes ("Book List — see all owned books in one list and toggle to see only those lent out").
+- Retrieval behavior matches the no-category-mismatch scenario: the Book Lending idea is not a startup-category website, and the interpreter selected only mechanical cards (persistence, CRUD, metrics) — no `website.strategy.*` card was forced. Audit: `artifacts/runs/2026-09-04T15-33-55-922Z/interpreter/pattern-retrieval.jsonl`.
+- Category-informed behavior (goals/views borrowed from `website.strategy.*` cards) could not be exercised by this run by design; it needs a run on a category-matching idea (e.g. the commerce or SaaS reference prompts).
+
+Caveats: single live run per side, runs on different days; GLM non-determinism and the baseline's 6 repair cycles confound token attribution. Treat deltas as directional. Reading: input-side reduction is consistent with the compounding effect of one-attempt verification (fewer tool-result round trips), and the added prompt knowledge did not increase input cost.
 
 ## Enrichments from the 2026-09-04 external report
 
