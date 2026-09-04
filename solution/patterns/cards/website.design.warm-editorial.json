@@ -18,15 +18,15 @@
   "verification": [
     "All neutrals derive from one charcoal base hue at varying opacities",
     "Body text reaches 4.5:1 contrast on the cream surface",
-    "No pure #000000 or #FFFFFF values and no second saturated hue appear"
+    "Brand neutrals avoid pure #000000 or #FFFFFF and competing decorative hues, subject to explicit user choices"
   ],
   "example_startups": [
     { "name": "Lovable", "note": "Cream editorial neutrals: one charcoal base rendered at varying opacities instead of a gray scale" }
   ],
   "visual_rules": [
-    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
-    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
-    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
-    "Never combine three or more saturated hues in one view"
+    "For brand decoration, prefer one signature accent used sparingly for identity and primary actions",
+    "Use a cohesive neutral palette; family tones are suggestions, not limits on explicit user design choices",
+    "Keep ordinary text, including button labels, at least 4.5:1 contrast and controls/focus states visible",
+    "Keep decorative hues restrained; retain colors needed for status, data distinctions, or explicit user requirements"
   ]
 }

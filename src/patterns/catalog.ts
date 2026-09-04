@@ -48,6 +48,8 @@ export interface PatternRetrievalResult {
     card: PatternCard;
     score: number;
     matched_terms: string[];
+    /** Complete authored signal phrases, distinct from incidental card prose. */
+    matched_signals: string[];
   }>;
 }
 
@@ -162,11 +164,12 @@ export function retrievePatterns(query: string, limit = 4): PatternRetrievalResu
   for (const stopword of QUERY_STOPWORDS) queryTerms.delete(stopword);
   const ranked = loadPatternCatalog()
     .map((card) => {
-      // Website vocabulary includes phrases such as "book a demo" and "return policy".
+      // Website vocabulary includes phrases such as "book a demo" and "night mode".
       // Credit their signal only when the whole ordered phrase occurs, not each
       // isolated word. Preserve the existing mechanical-card scoring contract.
-      const signals = card.id.startsWith(WEBSITE_STRATEGY_PREFIX)
-        ? card.signals.filter((signal) => queryPhrase.includes(phrase(signal)))
+      const matchedSignals = card.signals.filter((signal) => queryPhrase.includes(phrase(signal)));
+      const signals = card.id.startsWith(WEBSITE_STRATEGY_PREFIX) || card.id.startsWith(WEBSITE_DESIGN_PREFIX)
+        ? matchedSignals
         : card.signals;
       const weightedTerms = [
         ...signals.flatMap((signal) => [...terms(signal), ...terms(signal)]),
@@ -176,14 +179,14 @@ export function retrievePatterns(query: string, limit = 4): PatternRetrievalResu
       ];
       const matchedTerms = [...new Set(weightedTerms.filter((term) => queryTerms.has(term)))].sort();
       const score = weightedTerms.reduce((total, term) => total + (queryTerms.has(term) ? 1 : 0), 0);
-      return { card, score, matched_terms: matchedTerms };
+      return { card, score, matched_terms: matchedTerms, matched_signals: matchedSignals };
     })
-    .filter((result) => result.score > 0)
+    .filter((result) => result.score > 0 && (!result.card.id.startsWith(WEBSITE_DESIGN_PREFIX) || result.matched_signals.length > 0))
     .sort((left, right) => right.score - left.score || left.card.id.localeCompare(right.card.id));
 
   // At most one design family per result set (highest score): vibe-rich ideas
-  // must not spend multiple top-N slots on cosmetic cards, and design families
-  // must never crowd out strategy or mechanical cards.
+  // must not spend multiple top-N slots on cosmetic cards. This cap does not
+  // claim that one family cannot displace another result at the retrieval limit.
   const selected: typeof ranked = [];
   let designFamilySelected = false;
   for (const result of ranked) {

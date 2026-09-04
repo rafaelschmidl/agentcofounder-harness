@@ -16,17 +16,17 @@
     "Muted body text dropping below 4.5:1 contrast"
   ],
   "verification": [
-    "Saturated color appears only on actions and functional status",
+    "Saturated color supports actions or meaningful status/data distinctions",
     "Body text reaches 4.5:1 and status color pairs 3:1 contrast",
-    "Neutrals avoid pure #000000 and #FFFFFF"
+    "Brand neutrals avoid pure #000000 and #FFFFFF unless explicitly requested"
   ],
   "example_startups": [
     { "name": "Mullvad VPN", "note": "Restrained blue/dark-blue pair where green and red exist only to signal connection state" }
   ],
   "visual_rules": [
-    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
-    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
-    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
-    "Never combine three or more saturated hues in one view"
+    "For brand decoration, prefer one signature accent used sparingly for identity and primary actions",
+    "Use a cohesive neutral palette; family tones are suggestions, not limits on explicit user design choices",
+    "Keep ordinary text, including button labels, at least 4.5:1 contrast and controls/focus states visible",
+    "Keep decorative hues restrained; retain colors needed for status, data distinctions, or explicit user requirements"
   ]
 }

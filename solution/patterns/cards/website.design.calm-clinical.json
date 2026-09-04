@@ -16,17 +16,17 @@
     "Sterility where the direction calls for warm, calm trust"
   ],
   "verification": [
-    "At most two warm secondary tones accompany the monochrome base",
+    "At most two decorative warm tones accompany the monochrome brand base; retain needed status/data distinctions",
     "Body text reaches 4.5:1 contrast on the clinical surface",
-    "No pure #000000/#FFFFFF values and no three-plus saturated hues appear"
+    "Brand neutrals avoid pure #000000/#FFFFFF and competing saturated decoration, subject to explicit user choices"
   ],
   "example_startups": [
     { "name": "Neko Health", "note": "Warm optimistic secondaries (yellow, beige, brown, green) softening clinical monochrome into trust and calm" }
   ],
   "visual_rules": [
-    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
-    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
-    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
-    "Never combine three or more saturated hues in one view"
+    "For brand decoration, prefer one signature accent used sparingly for identity and primary actions",
+    "Use a cohesive neutral palette; family tones are suggestions, not limits on explicit user design choices",
+    "Keep ordinary text, including button labels, at least 4.5:1 contrast and controls/focus states visible",
+    "Keep decorative hues restrained; retain colors needed for status, data distinctions, or explicit user requirements"
   ]
 }

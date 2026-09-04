@@ -16,17 +16,17 @@
     "A second hue competing with the signature accent on the dark canvas"
   ],
   "verification": [
-    "Exactly one accent hue appears, only on primary actions and highlights",
+    "One brand accent hue supports primary actions and highlights; preserve meaningful status/data colors",
     "Body text reaches 4.5:1 contrast on the near-black surface",
-    "No pure #000000 or #FFFFFF values appear in the palette"
+    "Brand neutrals avoid pure #000000 or #FFFFFF unless the user explicitly requests them"
   ],
   "example_startups": [
     { "name": "Spotify", "note": "Single signature green carrying all identity against a near-black canvas" }
   ],
   "visual_rules": [
-    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
-    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
-    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
-    "Never combine three or more saturated hues in one view"
+    "For brand decoration, prefer one signature accent used sparingly for identity and primary actions",
+    "Use a cohesive neutral palette; family tones are suggestions, not limits on explicit user design choices",
+    "Keep ordinary text, including button labels, at least 4.5:1 contrast and controls/focus states visible",
+    "Keep decorative hues restrained; retain colors needed for status, data distinctions, or explicit user requirements"
   ]
 }
