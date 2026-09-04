@@ -1,10 +1,15 @@
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { dirname, join } from "node:path";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { COLLECTION_EXECUTION_SCHEMA } from "../../src/executable-collection/schema.js";
+import { executableCollectionEnabled } from "../../src/executable-collection/types.js";
 import { appendPatternRetrievalAudit } from "../../src/patterns/audit.js";
 import { retrievePatterns } from "../../src/patterns/catalog.js";
 import { replaceDraftValues, submitProductSpecDraftCandidate } from "../../src/product-spec/submit.js";
+import { normalizeDraftContainer } from "../../src/product-spec/normalize-draft.js";
 import type { SourceFragment } from "../../src/product-spec/types.js";
 
 function requiredEnvironment(name: string): string {
@@ -43,6 +48,10 @@ export function productSpecDraftSchema(): Record<string, unknown> {
   delete schema.$schema;
   delete schema.$id;
   schema.title = "Compact ProductSpec semantic draft";
+  if (executableCollectionEnabled()) {
+    schema.properties.collection_execution = COLLECTION_EXECUTION_SCHEMA;
+    schema.required.push("collection_execution");
+  }
   return schema;
 }
 
@@ -90,12 +99,21 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
       ],
       executionMode: "sequential",
       prepareArguments(args) {
-        // Pi validates the tool schema before execute. Preserve a complete draft
-        // at this boundary so an enum/schema rejection is repairable as well.
-        // Return the original arguments: both tool and canonical validation stay strict.
+        // Retain before SDK validation. Exact container moves are audited; meaning is untouched.
         if (typeof args === "object" && args !== null && !Array.isArray(args)
           && Object.hasOwn(args, "draft") && !Object.hasOwn(args, "replacements")) {
-          retainedDraft = structuredClone((args as { draft: unknown }).draft);
+          const rawDraft = (args as { draft: unknown }).draft;
+          const normalized = normalizeDraftContainer(rawDraft, draftSchema);
+          retainedDraft = structuredClone(normalized.draft);
+          if (normalized.moves.length) {
+            const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+            appendFileSync(join(dirname(outputFile), "draft-normalization.jsonl"), `${JSON.stringify({
+              kind: "root-container-moves", moves: normalized.moves,
+              raw_sha256: hash(rawDraft), normalized_sha256: hash(normalized.draft),
+              raw_draft: rawDraft, normalized_draft: normalized.draft,
+            })}\n`, "utf8");
+            return { ...args, draft: normalized.draft };
+          }
         }
         return args as { draft?: unknown; replacements?: { path: string; value: unknown }[] };
       },

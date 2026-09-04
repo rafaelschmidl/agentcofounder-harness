@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
 import { hasPattern } from "../patterns/catalog.js";
+import { COLLECTION_EXECUTION_SCHEMA } from "../executable-collection/schema.js";
+import { collectionExecutionErrors } from "../executable-collection/validate.js";
 import { hashIdea, segmentIdea } from "./fragments.js";
 import type { ProductSpec, SourceFragment, SourceReference } from "./types.js";
 
@@ -8,6 +10,8 @@ const schema = JSON.parse(
   readFileSync(new URL("./product-spec.schema.json", import.meta.url), "utf8"),
 ) as Record<string, unknown>;
 const ajv = new Ajv({ allErrors: true, strict: true });
+// Optional experiment extends canonical validation; the default schema and provenance rules remain strict.
+(schema.properties as Record<string, unknown>).collection_execution = COLLECTION_EXECUTION_SCHEMA;
 const validateSchema: ValidateFunction = ajv.compile(schema);
 
 export interface ProductSpecValidation {
@@ -143,7 +147,9 @@ function semanticErrors(spec: ProductSpec, idea: string, expectedFragments: Sour
     ) {
       errors.push(`${requirement.provenance} requirement ${requirement.id} must use IMPLEMENT disposition`);
     }
-    if (requirement.disposition === "IMPLEMENT" && requirement.journey_ids.length === 0) {
+    // Scope constraints still retain provenance and compiler coverage, but do not
+    // fabricate a product interaction merely to attach them to a journey.
+    if (requirement.disposition === "IMPLEMENT" && requirement.kind !== "SCOPE" && requirement.journey_ids.length === 0) {
       errors.push(`implemented requirement ${requirement.id} must map to an acceptance journey`);
     }
     if (requirement.disposition !== "IMPLEMENT" && requirement.journey_ids.length > 0) {
@@ -229,7 +235,7 @@ export function validateProductSpec(
   }
 
   const spec = candidate as ProductSpec;
-  const errors = semanticErrors(spec, idea, expectedFragments);
+  const errors = [...semanticErrors(spec, idea, expectedFragments), ...collectionExecutionErrors(spec)];
   if (errors.length > 0) return { valid: false, errors };
   return { valid: true, errors: [], spec };
 }

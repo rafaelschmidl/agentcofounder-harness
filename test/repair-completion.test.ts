@@ -10,7 +10,7 @@ describe("repair completion tool", () => {
   it("returns an explicit verification handoff without claiming a pass", async () => {
     const api = { registerTool: vi.fn() };
     repairCompletion(api as unknown as ExtensionAPI);
-    const tool = api.registerTool.mock.calls[0]![0] as {
+    const tool = api.registerTool.mock.calls.map(([registered]) => registered).find((registered) => registered.name === "finish_repair") as {
       name: string;
       execute(id: string, params: { summary: string }): Promise<{ terminate: boolean; details: { handoff: string; summary: string }; content: Array<{ text: string }> }>;
     };
@@ -36,7 +36,7 @@ describe("repair completion tool", () => {
   it("accepts a detailed repair handoff instead of spending calls shortening it", () => {
     const api = { registerTool: vi.fn() };
     repairCompletion(api as unknown as ExtensionAPI);
-    const tool = api.registerTool.mock.calls[0]![0] as { parameters: object };
+    const tool = api.registerTool.mock.calls.map(([registered]) => registered).find((registered) => registered.name === "finish_repair") as { parameters: object };
     const validate = new Ajv().compile(tool.parameters);
     const summary = "Fixed the storage fixture, scoped the borrower input to its book row, and preserved the persistence and validation assertions. ".repeat(4);
     expect(summary.length).toBeGreaterThan(300);

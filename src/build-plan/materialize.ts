@@ -100,6 +100,7 @@ export async function materializeBuildPlan(
   }
   for (const file of agentSeeds()) {
     const ownership = plan.file_ownership.find((candidate) => candidate.path === file.path);
+    if (ownership?.owner === "BLOCK") continue;
     if (!ownership || ownership.owner !== "AGENT") throw new Error(`Missing AGENT ownership for ${file.path}`);
     await writeAgentSeed(outputDirectory, file);
   }
@@ -107,7 +108,7 @@ export async function materializeBuildPlan(
     throw new Error("Materializers produced duplicate file paths");
   }
   await Promise.all(files.map((file) => writeDeterministicFile(outputDirectory, file)));
-  return [...files.map((file) => file.path), ...agentSeeds().map((file) => file.path)].sort();
+  return [...files.map((file) => file.path), ...agentSeeds().filter((file) => plan.file_ownership.some((entry) => entry.path === file.path && entry.owner === "AGENT")).map((file) => file.path)].sort();
 }
 
 export async function writeCompilerArtifacts(

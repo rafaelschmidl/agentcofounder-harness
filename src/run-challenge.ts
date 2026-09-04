@@ -11,6 +11,7 @@ import {
   loadRepairPrompts,
 } from "./builder.js";
 import { compileProductSpec } from "./build-plan/compile.js";
+import { executableCollectionEnabled } from "./executable-collection/types.js";
 import {
   linkBuildPlan,
   materializeBuildPlan,
@@ -34,6 +35,7 @@ import { RunTrace } from "./trace.js";
 import { MAX_PROVIDER_RESPONSES, runLimitsFromEnvironment } from "./run-limits.js";
 import { buildSemanticReviewInput, MAX_REVIEW_RESPONSES, runSemanticReview, semanticReviewRepairDiagnosis } from "./semantic-review.js";
 import type { AppVerification, RunResult } from "./types.js";
+import type { BuildPlan } from "./build-plan/types.js";
 import { validateResultObject } from "./validate-result.js";
 import { captureRequiredArtifacts, portHasListener, unavailableAppVerification, verifyGeneratedApp } from "./verify-app.js";
 
@@ -50,6 +52,15 @@ const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
 
 export { runPi, type CommandResult } from "./pi-runner.js";
+
+export function scopeRepairToOwnership(diagnosis: RepairDiagnosis, plan: BuildPlan): RepairDiagnosis {
+  const permittedPaths = diagnosis.permittedPaths.filter((file) => plan.file_ownership.some((entry) => entry.path === file && entry.owner === "AGENT"));
+  if (permittedPaths.length === diagnosis.permittedPaths.length) return diagnosis;
+  const evidence = diagnosis.evidence.replace(/## Permitted repair paths\n\n[\s\S]*?(?=\n\n## |$)/u,
+    `## Permitted repair paths\n\n${permittedPaths.map((file) => `- ${file}`).join("\n")}`)
+    + "\n\nCompiler-owned domain semantics cannot be rewritten. Fix integration errors using the actual supplied domain API; never weaken journey assertions to hide a domain mismatch.";
+  return { ...diagnosis, permittedPaths, evidence, key: createHash("sha256").update(`${diagnosis.key}\n${permittedPaths.join("\n")}`).digest("hex") };
+}
 
 export function runRequiresFailureExit(
   piExitCode: number,
@@ -137,6 +148,7 @@ Environment:
   CHALLENGE_MAX_OUTPUT_TOKENS Per-response output cap, including reasoning (default: 8192; maximum: 32768)
   CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 1800000)
   CHALLENGE_SEMANTIC_REVIEW Set to 1 for an experimental source review after functional checks (default: off)
+  CHALLENGE_EXECUTABLE_COLLECTION Set to 1 for experimental compiler-owned collection semantics (default: off)
 `);
 }
 
@@ -305,7 +317,7 @@ async function main(): Promise<void> {
   });
 
   await trace.record("compilation", "started", "Started deterministic ProductSpec compilation.");
-  const plan = compileProductSpec(spec);
+  const plan = compileProductSpec(spec, { executableCollection: executableCollectionEnabled() });
   const planValidation = validateBuildPlan(plan, spec);
   if (!planValidation.valid) {
     await trace.record("compilation", "failed", "BuildPlan validation failed.", { errors: planValidation.errors });
@@ -415,7 +427,11 @@ async function main(): Promise<void> {
       }
       if ((verification.passed && !semanticDiagnosis) || attempt === MAX_REPAIR_CYCLES) break;
 
-      const diagnosis = semanticDiagnosis ?? await diagnoseVerification(verificationDirectory, outputDirectory, verification);
+      const diagnosis = scopeRepairToOwnership(semanticDiagnosis ?? await diagnoseVerification(verificationDirectory, outputDirectory, verification), plan);
+      if (diagnosis.permittedPaths.length === 0) {
+        await trace.record("repair", "failed", "Failure is confined to compiler-owned semantics; product code cannot rewrite that contract.", { diagnosis_key: diagnosis.key });
+        break;
+      }
       if (diagnosisKeys.has(diagnosis.key)) {
         await trace.record("repair", "failed", "Refused a repair with an unchanged diagnosis.", {
           attempt: attempt + 1,
