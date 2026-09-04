@@ -41,6 +41,17 @@
       "required": ["summary", "actors", "goals", "constraints"],
       "properties": {
         "summary": { "$ref": "#/$defs/nonEmptyString" },
+        "experience": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "visual_direction", "composition", "interaction_priorities"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "visual_direction": { "type": "string", "minLength": 1, "maxLength": 600 },
+            "composition": { "type": "string", "minLength": 1, "maxLength": 800 },
+            "interaction_priorities": { "$ref": "#/$defs/stringArray" }
+          }
+        },
         "actors": {
           "type": "array",
           "minItems": 1,

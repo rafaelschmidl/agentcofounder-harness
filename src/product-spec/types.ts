@@ -116,6 +116,12 @@ export interface ProductSpec {
   fragment_disposition: FragmentDisposition[];
   product: {
     summary: string;
+    experience?: {
+      name: string;
+      visual_direction: string;
+      composition: string;
+      interaction_priorities: string[];
+    };
     actors: Actor[];
     goals: string[];
     constraints: string[];

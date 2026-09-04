@@ -9,10 +9,11 @@ const objectSchema = (properties: Record<string, unknown>, required: string[] = 
 });
 
 function foundationFiles(config: Record<string, unknown>): MaterializedFile[] {
-  const productSummary = typeof config.product_name === "string" ? config.product_name.trim() : "Your collection";
+  const productSummary = typeof config.product_summary === "string" ? config.product_summary.trim()
+    : typeof config.product_name === "string" ? config.product_name.trim() : "Your collection";
   // The interpreted summary may contain the entire brief. Keep it available as
   // context while preventing it from becoming a paragraph-sized product title.
-  const normalized = productSummary.replace(/\s+/gu, " ") || "Your collection";
+  const normalized = (typeof config.product_name === "string" ? config.product_name : productSummary).replace(/\s+/gu, " ") || "Your collection";
   const productName = normalized.length <= 56
     ? normalized
     : `${normalized.slice(0, 53).replace(/\s+\S*$/u, "").trimEnd()}…`;
@@ -331,7 +332,7 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
   {
     id: "app.foundation",
     version: "1.1.0",
-    config_schema: objectSchema({ product_name: { type: "string", minLength: 1 } }, ["product_name"]),
+    config_schema: objectSchema({ product_name: { type: "string", minLength: 1 }, product_summary: { type: "string", minLength: 1 } }, ["product_name"]),
     capabilities: ["react-vite-app", "typed-extension-boundary"],
     dependencies: [],
     conflicts: [],

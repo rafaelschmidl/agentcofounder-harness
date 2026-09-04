@@ -159,6 +159,27 @@ describe("deterministic BuildPlan compiler", () => {
     expect(product.PRODUCT_SUMMARY).toBe(spec.product.summary);
   });
 
+  it("uses the product identity while preserving the internal brief and required behavior", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "experience-identity-"));
+    temporaryDirectories.push(directory);
+    const spec = validProductSpec();
+    const originalPlan = compileProductSpec(spec);
+    spec.product.experience = {
+      name: "Fieldnotes",
+      visual_direction: "Editorial serif titles and restrained ink accents.",
+      composition: "A compact notebook index with contextual editing.",
+      interaction_priorities: ["Keep the current draft when validation fails"],
+    };
+    const plan = compileProductSpec(spec);
+    expect(validateBuildPlan(plan, spec).errors).toEqual([]);
+    expect(plan.requirement_mapping).toEqual(originalPlan.requirement_mapping);
+    expect(plan.verification_obligations).toEqual(originalPlan.verification_obligations);
+    await materializeBuildPlan(plan, spec, directory);
+    const product = await import(pathToFileURL(path.join(directory, "src/system/product.ts")).href);
+    expect(product.PRODUCT_NAME).toBe("Fieldnotes");
+    expect(product.PRODUCT_SUMMARY).toBe(spec.product.summary);
+  });
+
   it("allows the builder to edit only exact AGENT-owned files", () => {
     const plan = compileProductSpec(validProductSpec());
     expect(mayAgentWrite("/tmp/app", plan.file_ownership, "src/product/App.tsx")).toBe(true);

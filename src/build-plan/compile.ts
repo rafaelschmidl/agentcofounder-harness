@@ -74,7 +74,7 @@ function selectedBlockIds(spec: ProductSpec): Set<string> {
 function blockConfig(blockId: string, spec: ProductSpec): Record<string, unknown> {
   switch (blockId) {
     case "app.foundation":
-      return { product_name: spec.product.summary };
+      return { product_name: spec.product.experience?.name ?? spec.product.summary, product_summary: spec.product.summary };
     case "data.local-repository":
       return { storage_key: `agent-cofounder:${spec.source_idea_hash.slice(7, 23)}`, schema_version: 1 };
     case "domain.collection":
