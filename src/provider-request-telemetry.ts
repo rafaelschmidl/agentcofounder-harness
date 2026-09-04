@@ -12,6 +12,22 @@ const ERROR_CODES = new Set([
 const ERROR_NAMES = new Set([
   "Error", "TypeError", "AbortError", "TimeoutError", "ConnectTimeoutError", "HeadersTimeoutError", "BodyTimeoutError", "SocketError",
 ]);
+const REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+
+function reasoningControls(payload: Record<string, unknown>): Record<string, string | boolean | null> {
+  const effort = (value: unknown) => typeof value === "string" && REASONING_EFFORTS.has(value) ? value : null;
+  const thinking = payload.thinking;
+  const thinkingType = thinking && typeof thinking === "object" && "type" in thinking ? thinking.type : undefined;
+  const template = payload.chat_template_kwargs && typeof payload.chat_template_kwargs === "object"
+    ? payload.chat_template_kwargs as Record<string, unknown> : {};
+  // Only known control labels and booleans are evidence; never serialize arbitrary nested payload values.
+  return {
+    wire_reasoning_effort: effort(payload.reasoning_effort),
+    wire_thinking_enabled: typeof thinking === "boolean" ? thinking : thinkingType === "enabled" ? true : thinkingType === "disabled" ? false : null,
+    wire_template_reasoning_effort: effort(template.reasoning_effort),
+    wire_template_thinking_enabled: typeof template.enable_thinking === "boolean" ? template.enable_thinking : null,
+  };
+}
 
 /** Capture transport causes before the OpenAI SDK replaces them with a generic timeout. */
 function errorKinds(error: unknown): { name: string; code?: string }[] {
@@ -37,7 +53,7 @@ function requestShape(body: BodyInit | null | undefined): Record<string, unknown
     const cap = parsed.max_completion_tokens ?? parsed.max_tokens;
     // Byte counts are evidence about the actual wire payload, not an assumed tokenizer bound.
     const input = JSON.stringify({ messages: parsed.messages, tools: parsed.tools, functions: parsed.functions });
-    return { ...common, wire_model: typeof parsed.model === "string" ? parsed.model : null, input_payload_bytes: Buffer.byteLength(input), output_token_cap: Number.isInteger(cap) && Number(cap) > 0 ? cap : null };
+    return { ...common, wire_model: typeof parsed.model === "string" ? parsed.model : null, input_payload_bytes: Buffer.byteLength(input), output_token_cap: Number.isInteger(cap) && Number(cap) > 0 ? cap : null, ...reasoningControls(parsed) };
   } catch { return { ...common, input_payload_bytes: null, output_token_cap: null }; }
 }
 

@@ -91,6 +91,36 @@ it("uses and durably settles the shared guard through the installed official pro
   }, true);
 }, 20_000);
 
+it("logs the installed official provider's effective high effort for requested low, and none for off", async () => {
+  await fixture(async (provider, logPath, requests) => {
+    const model = provider.getModels()[0]!;
+    expect(model.thinkingLevelMap).toMatchObject({ off: "none", low: null, high: "high", max: "max" });
+    const context = { messages: [{ role: "user" as const, content: "fixture-private-prompt", timestamp: 1 }] };
+    const low = await provider.streamSimple(model, context, { apiKey: "fixture-private-key", maxTokens: 64, maxRetries: 0, reasoning: "low" }).result();
+    // Pi represents an effective off level by omitting the SDK reasoning option.
+    const off = await provider.streamSimple(model, context, { apiKey: "fixture-private-key", maxTokens: 64, maxRetries: 0 }).result();
+    expect([low.stopReason, off.stopReason]).toEqual(["stop", "stop"]);
+    expect(requests.map((request) => JSON.parse(request.body).reasoning_effort)).toEqual(["high", "none"]);
+    const text = await readFile(logPath, "utf8");
+    const starts = text.trim().split("\n").map((line) => JSON.parse(line)).filter((event) => event.event === "request_started");
+    expect(starts.map((event) => event.wire_reasoning_effort)).toEqual(["high", "none"]);
+    expect(starts.every((event) => event.wire_thinking_enabled === null && event.wire_template_thinking_enabled === null)).toBe(true);
+    expect(text).not.toContain("fixture-private");
+  });
+}, 20_000);
+
+it("retains only allowlisted reasoning labels and boolean thinking flags", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "provider-control-telemetry-"));
+  try {
+    const logPath = path.join(directory, "requests.jsonl");
+    const fetch = instrumentProviderFetch(async () => new Response(null, { status: 204 }), logPath);
+    await fetch("http://fixture.invalid", { body: JSON.stringify({ reasoning_effort: "fixture-private-effort", thinking: { type: "enabled", content: "fixture-private-thinking" }, chat_template_kwargs: { enable_thinking: false, reasoning_effort: "max", secret: "fixture-private-secret" } }) });
+    const text = await readFile(logPath, "utf8");
+    expect(JSON.parse(text.split("\n")[0]!)).toMatchObject({ wire_reasoning_effort: null, wire_thinking_enabled: true, wire_template_reasoning_effort: "max", wire_template_thinking_enabled: false });
+    expect(text).not.toContain("fixture-private");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 it("records the original connection cause before the installed SDK normalizes it, with exactly one transport attempt", async () => {
   await fixture(async (provider, logPath, requests) => {
     const cause = Object.assign(new Error("Connect Timeout Error timed out: fixture-private-cause"), { code: "UND_ERR_CONNECT_TIMEOUT" });
