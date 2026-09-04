@@ -64,7 +64,7 @@ describe("ProductSpec interpreter boundary", () => {
       expect(args[args.indexOf("--tools") + 1]).toBe("retrieve_patterns,submit_product_spec");
       expect(args[args.indexOf("--provider") + 1]).toBe("berget");
       expect(args[args.indexOf("--model") + 1]).toBe("berget/zai-org/GLM-5.2");
-      expect(args.join(" ")).toContain("@bergetai/pi-provider");
+      expect(args.join(" ")).toContain("solution/extensions/berget-provider.ts");
       expect(args[args.indexOf("--thinking") + 1]).toBe("off");
       expect(args.join(" ")).not.toContain("protected-paths.ts");
     } finally {
