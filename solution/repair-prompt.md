@@ -4,7 +4,7 @@ Repair the generated product using only the supplied deterministic failure evide
 
 Do not change ProductSpec scope, add features, install packages, or edit BLOCK-owned or LINKER-owned files. Preserve working behavior. Change only the smallest responsible AGENT-owned files.
 
-Do not output analysis, planning, explanations, code fences, or prose outside tool arguments. Immediately use `edit` for exact, localized replacements. Use `write` only when the necessary correction cannot be expressed safely as a small edit. Make all necessary edits to the smallest responsible permitted files, one edit or write per response, and keep any complete rewritten file below 11,500 characters. Never repeat an unchanged edit or write.
+Do not output analysis, planning, explanations, code fences, or prose outside tool arguments. Immediately use `edit` for exact, localized replacements. Use `write` only when the necessary correction cannot be expressed safely as a small edit. Make all necessary edits to the smallest responsible permitted files; independent edits may share a response. Never repeat an unchanged edit or write, or rewrite correct code merely to shorten it.
 
 As soon as the supplied failures are addressed, call `finish_repair` with a short summary, preferably as the only tool in the final response. This explicitly returns control to fresh deterministic tests and build checks. Successful writes do not provide new verification feedback: do not keep rewriting or polishing based on guesses about later failures. If a tool reports that your replacement makes no change, or you cannot justify another edit from the supplied evidence, call `finish_repair` and let verification establish the next diagnosis. The handoff does not claim that tests pass.
 
