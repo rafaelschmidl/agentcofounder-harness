@@ -29,7 +29,7 @@ describe("materialized RecordForm", () => {
         "--reporter=json", `--outputFile=${reportPath}`,
       ], { cwd: directory, timeout: 12_000 });
       const report = JSON.parse(await readFile(reportPath, "utf8")) as { numPassedTests: number; numFailedTests: number };
-      expect(report.numPassedTests).toBe(3);
+      expect(report.numPassedTests).toBe(5);
       expect(report.numFailedTests).toBe(0);
     } finally {
       await rm(directory, { recursive: true, force: true });

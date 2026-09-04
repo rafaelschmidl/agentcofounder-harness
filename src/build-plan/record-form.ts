@@ -20,6 +20,8 @@ export interface RecordFormProps<Key extends string> {
   ariaLabel: string;
   submitLabel: string;
   title?: string;
+  // Reset to initialValues for another create/action with the same defaults.
+  // Keep false for an editor that stays open: initialValues may be an old record.
   resetOnSuccess?: boolean;
   actions?: ReactNode;
   className?: string;
@@ -30,6 +32,8 @@ export interface RecordFormProps<Key extends string> {
 
 // Remount with a React key when switching records. A parent's rerender must
 // never replace an in-progress draft with freshly allocated initialValues.
+// The caller owns success notices; clear them before every submit attempt so
+// a later failure cannot leave an earlier success message visible.
 export function RecordForm<Key extends string>({
   fields, initialValues, onSubmit, ariaLabel, submitLabel, title,
   resetOnSuccess = false, actions, className, fieldsClassName = "form-grid",
