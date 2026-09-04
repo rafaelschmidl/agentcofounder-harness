@@ -252,10 +252,11 @@ function accessibleShellFiles(): MaterializedFile[] {
       path: "src/system/ui.tsx",
       content: `import { useEffect, useId, type PropsWithChildren, type ReactNode } from "react";
 
-export function AppShell({ title, subtitle, eyebrow, actions, navigation, children }: PropsWithChildren<{
+export function AppShell({ title, subtitle, eyebrow, mark, actions, navigation, children }: PropsWithChildren<{
   title: string;
   subtitle?: string;
   eyebrow?: string;
+  mark?: ReactNode;
   actions?: ReactNode;
   navigation?: ReactNode;
 }>) {
@@ -266,7 +267,7 @@ export function AppShell({ title, subtitle, eyebrow, actions, navigation, childr
       <a className="skip-link" href={"#" + mainId}>Skip to content</a>
       <header className="app-header">
         <div className="app-identity">
-          <span className="product-mark" aria-hidden="true">{title.trim().slice(0, 1).toUpperCase()}</span>
+          {mark ? <span className="product-mark" aria-hidden="true">{mark}</span> : null}
           <div className="app-heading">
             {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
             <h1>{title}</h1>
