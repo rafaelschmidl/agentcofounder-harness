@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -15,6 +15,7 @@ type Response = ToolCall[] | "stop";
 /** Real installed Pi, its built-in write implementation, and a local HTTP provider. */
 async function runFixture(options: {
   files: string[];
+  permittedFiles?: string[];
   repair?: boolean;
   read?: boolean;
   prepare?: (app: string) => Promise<void>;
@@ -90,7 +91,7 @@ async function runFixture(options: {
       env: {
         PATH: process.env.PATH, HOME: directory, PI_CODING_AGENT_DIR: state, PI_OFFLINE: "1",
         SYSTEM_V0_OWNERSHIP_FILE: ownershipFile,
-        ...(options.repair ? { SYSTEM_V0_PERMITTED_PATHS: JSON.stringify(options.files) } : {}),
+        ...(options.repair ? { SYSTEM_V0_PERMITTED_PATHS: JSON.stringify(options.permittedFiles ?? options.files) } : {}),
       },
     });
     let stdout = "";
@@ -170,6 +171,27 @@ it("returns a substantive repair batch to verification after all files and same-
   expect(result.content).toMatchObject({ "app.ts": "same-batch correction", "domain.ts": "repair first pass", "styles.css": "repair first pass" });
   expect(result.events.filter((event) => event.type === "tool_execution_end")).toHaveLength(4);
   expect(result.events.some((event) => event.toolName === "finish_repair")).toBe(false);
+}, 20_000);
+
+it("repairs absolute and aliased paths to the permitted file while retaining other ownership restrictions", async () => {
+  const result = await runFixture({
+    files: ["app.ts", "styles.css"], permittedFiles: ["app.ts"], repair: true,
+    prepare: async (app) => {
+      await writeFile(path.join(app, "app.ts"), "original");
+      await writeFile(path.join(app, "styles.css"), "unchanged style");
+      await symlink(app, path.join(path.dirname(app), "app-alias"), "dir");
+    },
+    response: (request, app) => request === 1 ? [
+      { path: path.join(app, "styles.css"), content: "must remain out of this repair" },
+      { path: path.join(app, "system.ts"), content: "must remain protected" },
+    ] : [
+      { name: "edit", arguments: { path: path.join(path.dirname(app), "app-alias/app.ts"), oldText: "original", newText: "alias correction" } },
+      { path: path.join(app, "app.ts"), content: "absolute correction" },
+    ],
+  });
+  expect(result.requests, JSON.stringify(result.events.filter((event) => event.type === "tool_execution_end"))).toBe(2);
+  expect(result.content).toMatchObject({ "app.ts": "absolute correction", "styles.css": "unchanged style", "system.ts": "immutable foundation" });
+  expect(result.events.filter((event) => event.type === "tool_execution_end" && event.isError)).toHaveLength(2);
 }, 20_000);
 
 it("does not hand back for noop writes, refused writes, failed edits, or reads without a substantive mutation", async () => {

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createWriteToolDefinition, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { FileOwnership } from "../../src/build-plan/types.js";
+import { canonicalFilePath, relativeFilePath } from "../../src/file-path.js";
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name];
@@ -10,29 +11,29 @@ function requiredEnvironment(name: string): string {
 }
 
 export function mayAgentWrite(appRoot: string, ownership: FileOwnership[], candidate: string): boolean {
-  const absolute = path.resolve(appRoot, candidate);
-  const relative = path.relative(appRoot, absolute).split(path.sep).join("/");
+  const relative = relativeFilePath(appRoot, candidate);
   if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) return false;
   return ownership.some((entry) => entry.owner === "AGENT" && entry.path === relative);
 }
 
-export function mayWritePermittedPath(candidate: string, permittedPaths?: readonly string[]): boolean {
-  return permittedPaths === undefined || permittedPaths.includes(candidate.split(path.sep).join("/"));
+export function mayWritePermittedPath(candidate: string, permittedPaths?: readonly string[], appRoot = process.cwd()): boolean {
+  return permittedPaths === undefined || permittedPaths.includes(relativeFilePath(appRoot, candidate));
 }
 
 /** Keep the native write semantics, but finish a complete builder inside Pi. */
 export function createCompletingWriteTool(appRoot: string, ownership: readonly FileOwnership[]) {
-  const required = new Set(ownership.filter((entry) => entry.owner === "AGENT").map((entry) => path.resolve(appRoot, entry.path)));
+  const required = new Set(ownership.filter((entry) => entry.owner === "AGENT").map((entry) => canonicalFilePath(path.resolve(appRoot, entry.path))));
   const completed = new Set<string>();
   const write = createWriteToolDefinition(appRoot);
   return {
     ...write,
     async execute(...args: Parameters<typeof write.execute>) {
+      const absolute = canonicalFilePath(path.resolve(appRoot, args[1].path));
+      args[1] = { ...args[1], path: absolute };
       const result = await write.execute(...args);
-      const absolute = path.resolve(appRoot, args[1].path);
       if (required.has(absolute)) completed.add(absolute);
       const remaining = [...required].filter((candidate) => !completed.has(candidate))
-        .map((candidate) => path.relative(appRoot, candidate).split(path.sep).join("/"));
+        .map((candidate) => relativeFilePath(appRoot, candidate));
       return {
         ...result,
         content: [...result.content, {
@@ -69,7 +70,7 @@ export default function ownedPaths(pi: ExtensionAPI) {
   pi.on("tool_call", async (event, context) => {
     if (event.toolName !== "write" && event.toolName !== "edit") return undefined;
     const candidate = String((event.input as Record<string, unknown>).path ?? "");
-    if (mayAgentWrite(appRoot, ownership, candidate) && mayWritePermittedPath(candidate, permittedPaths)) {
+    if (mayAgentWrite(appRoot, ownership, candidate) && mayWritePermittedPath(candidate, permittedPaths, appRoot)) {
       return undefined;
     }
     if (context.hasUI) context.ui.notify(`Blocked non-agent-owned write: ${candidate}`, "warning");

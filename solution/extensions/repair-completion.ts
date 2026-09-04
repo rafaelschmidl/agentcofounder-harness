@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createEditToolDefinition, createWriteToolDefinition, defineTool, type ExtensionAPI, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
+import { canonicalFilePath } from "../../src/file-path.js";
 
 export default function repairCompletion(pi: ExtensionAPI) {
   let handedOff = false;
@@ -11,7 +12,10 @@ export default function repairCompletion(pi: ExtensionAPI) {
     return {
       ...tool,
       async execute(...args: Parameters<typeof tool.execute>) {
-        const file = path.resolve(process.cwd(), String((args[1] as { path: string }).path));
+        const file = canonicalFilePath(path.resolve(process.cwd(), String((args[1] as { path: string }).path)));
+        // Native mutations queue by path. Equivalent aliases must share the
+        // same queue as well as the same ownership decision.
+        args[1] = { ...args[1], path: file };
         const before = await contents(file);
         // Preserve native failures. An unsuccessful edit must remain an error,
         // even when another call in its batch requests a verification handoff.

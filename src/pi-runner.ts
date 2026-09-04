@@ -3,6 +3,7 @@ import { createWriteStream } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { signalProcessTree, terminateProcessTree, usesDetachedProcessGroup } from "./process-tree.js";
+import { canonicalFilePath, relativeFilePath } from "./file-path.js";
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
@@ -100,7 +101,7 @@ export class PiFileCompletion {
   private pendingResponseTools = 0;
 
   constructor(private readonly cwd: string, requiredPaths: readonly string[] = []) {
-    this.required = new Set(requiredPaths.map((file) => path.resolve(cwd, file)));
+    this.required = new Set(requiredPaths.map((file) => canonicalFilePath(path.resolve(cwd, file))));
   }
 
   get complete(): boolean {
@@ -109,14 +110,14 @@ export class PiFileCompletion {
   }
 
   get completedFiles(): string[] {
-    return [...this.completed].map((file) => path.relative(this.cwd, file)).sort();
+    return [...this.completed].map((file) => relativeFilePath(this.cwd, file)).sort();
   }
 
   observe(summary: EventSummary): boolean {
     if (summary.assistantCall) this.pendingResponseTools = summary.toolCalls;
     if (summary.toolExecutionStarted && summary.toolCallId && summary.toolPath &&
         (summary.toolName === "write" || summary.toolName === "edit")) {
-      const file = path.resolve(this.cwd, summary.toolPath);
+      const file = canonicalFilePath(path.resolve(this.cwd, summary.toolPath));
       if (this.required.has(file)) this.pending.set(summary.toolCallId, file);
     }
     if (summary.toolExecutionEnded && summary.toolCallId) {
