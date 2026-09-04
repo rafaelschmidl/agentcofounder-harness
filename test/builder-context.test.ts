@@ -16,11 +16,23 @@ describe("builder execution context", () => {
     expect(context.entities).toEqual(spec.entities);
     expect(context.workflows).toEqual(spec.workflows);
     expect(context.exclusions).toEqual(["No authentication"]);
-    expect(context.build.verification_obligations).toEqual(plan.verification_obligations);
+    expect(context.build.verification_obligations).toEqual(plan.verification_obligations.map(({ journey_id }) => ({ journey_id })));
+    expect(context.build.verification_obligations.map(({ journey_id }) => context.acceptance_journeys.find((journey) => journey.id === journey_id)?.expected_outcomes))
+      .toEqual(plan.verification_obligations.map(({ checks }) => checks));
     expect(context.build.owned_paths).toEqual(plan.file_ownership.filter((entry) => entry.owner === "AGENT").map((entry) => entry.path));
     expect(context).not.toHaveProperty("source_fragments");
     expect(context.requirements.every((requirement) => !("source_refs" in requirement))).toBe(true);
+    expect(context.requirements.every((requirement) => !("journey_ids" in requirement))).toBe(true);
     expect(spec).toEqual(before);
     expect(JSON.stringify(context).length).toBeLessThan(JSON.stringify({ spec, plan }).length);
+  });
+
+  it("retains verification checks that add to canonical journey outcomes", () => {
+    const spec = validProductSpec();
+    const plan = compileProductSpec(spec);
+    plan.verification_obligations[0]!.checks.push("Additional deterministic obligation");
+    const context = builderExecutionContext(spec, plan);
+    expect(context.build.verification_obligations[0]).toEqual(plan.verification_obligations[0]);
+    expect(spec.acceptance_journeys[0]!.expected_outcomes).not.toContain("Additional deterministic obligation");
   });
 });
