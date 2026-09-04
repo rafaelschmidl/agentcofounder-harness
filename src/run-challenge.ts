@@ -280,7 +280,7 @@ async function main(): Promise<void> {
   if (!args.skipAppInstall) {
     const installCode = await runInherited(
       commandName("npm"),
-      ["ci", "--ignore-scripts", "--prefer-offline"],
+      ["ci", "--ignore-scripts", "--prefer-offline", "--no-audit", "--no-fund"],
       outputDirectory,
     );
     if (installCode !== 0) throw new Error(`App dependency installation failed with exit code ${installCode}`);

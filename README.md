@@ -108,7 +108,7 @@ Reports include status, summary, implemented features, assumptions, journey test
 
 Development and validation run natively on macOS. The pinned lockfiles include Linux ARM64 packages, and a Dockerfile is included, but the current candidate has not yet completed Linux ARM64 or restricted-network packaging validation.
 
-The default challenge recreates app dependencies with `npm ci --ignore-scripts --prefer-offline`. In a runtime that only permits provider traffic, those packages must already be available in its npm cache. The existing Dockerfile installs root/template dependencies and warms that cache at build time. Generated applications should use bundled assets and local interfaces rather than depend on runtime access to external fonts or services.
+The default challenge recreates app dependencies with `npm ci --ignore-scripts --prefer-offline --no-audit --no-fund`. In a runtime that only permits provider traffic, those packages must already be available in its npm cache. The Dockerfile installs root/template dependencies and warms that cache at build time, then sets `npm_config_offline=true`. Its build must recreate and build the seed app with this offline setting before packaging. For an equivalent native smoke test, use `npm_config_offline=true npm run challenge -- --prepare-only` after installing the dependencies. Generated applications should use bundled assets and local interfaces rather than depend on runtime access to external fonts or services.
 
 ## Source map
 
