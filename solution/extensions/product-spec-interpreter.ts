@@ -8,8 +8,9 @@ import { COLLECTION_EXECUTION_SCHEMA } from "../../src/executable-collection/sch
 import { executableCollectionEnabled } from "../../src/executable-collection/types.js";
 import { appendPatternRetrievalAudit } from "../../src/patterns/audit.js";
 import { retrievePatterns } from "../../src/patterns/catalog.js";
-import { replaceDraftValues, submitProductSpecDraftCandidate } from "../../src/product-spec/submit.js";
+import { replaceDraftValues, submitProductSpecDraftCandidate, type DraftReplacement, type ProductSpecSubmission } from "../../src/product-spec/submit.js";
 import { normalizeDraftContainer } from "../../src/product-spec/normalize-draft.js";
+import { expandProductSpecDraft } from "../../src/product-spec/draft.js";
 import type { SourceFragment } from "../../src/product-spec/types.js";
 
 function requiredEnvironment(name: string): string {
@@ -56,6 +57,18 @@ export function productSpecDraftSchema(): Record<string, unknown> {
 }
 
 const draftSchema = productSpecDraftSchema();
+const submissionParameters = Type.Object({
+  draft: Type.Optional(Type.Unsafe<unknown>(draftSchema)),
+  replacements: Type.Optional(Type.Array(Type.Object({
+    path: Type.String({ pattern: "^/", description: "JSON Pointer to an existing value, e.g. /requirements/0/source_refs" }),
+    value: Type.Unknown({ description: "Replacement value; the full repaired draft is validated again" }),
+  }), { minItems: 1, maxItems: 32 })),
+});
+type SubmissionDetails = Partial<ProductSpecSubmission> & {
+  accepted: boolean;
+  previous_draft_retained?: boolean;
+  rejected_replacements?: DraftReplacement[];
+};
 
 export default function productSpecInterpreter(pi: ExtensionAPI) {
   const ideaFile = requiredEnvironment("SYSTEM_V0_IDEA_FILE");
@@ -89,7 +102,7 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
   );
 
   pi.registerTool(
-    defineTool({
+    defineTool<typeof submissionParameters, SubmissionDetails>({
       name: "submit_product_spec",
       label: "Submit ProductSpec",
       description: "Expand, validate, and save a ProductSpec draft. Submit draft initially. After rejection, the draft is retained: use replacements with JSON Pointer paths to fix only invalid values instead of resending it. Every repair passes the same full validation.",
@@ -117,19 +130,14 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
         }
         return args as { draft?: unknown; replacements?: { path: string; value: unknown }[] };
       },
-      parameters: Type.Object({
-        draft: Type.Optional(Type.Unsafe<unknown>(draftSchema)),
-        replacements: Type.Optional(Type.Array(Type.Object({
-          path: Type.String({ pattern: "^/", description: "JSON Pointer to an existing value, e.g. /requirements/0/source_refs" }),
-          value: Type.Unknown({ description: "Replacement value; the full repaired draft is validated again" }),
-        }), { minItems: 1, maxItems: 32 })),
-      }),
+      parameters: submissionParameters,
       async execute(_toolCallId, params) {
+        let attemptedDraft: unknown;
         try {
           if (Object.hasOwn(params, "draft") === Object.hasOwn(params, "replacements")) {
             throw new Error("Supply exactly one of draft or replacements.");
           }
-          retainedDraft = params.replacements
+          attemptedDraft = params.replacements
             ? replaceDraftValues(retainedDraft, params.replacements)
             : structuredClone(params.draft);
         } catch (error) {
@@ -143,6 +151,25 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
           readFile(fragmentsFile, "utf8"),
         ]);
         const fragments = JSON.parse(fragmentsJson) as SourceFragment[];
+        if (params.replacements && expandProductSpecDraft(retainedDraft, idea, fragments).candidate) {
+          const attemptedExpansion = expandProductSpecDraft(attemptedDraft, idea, fragments);
+          if (!attemptedExpansion.candidate) {
+            return {
+              content: [{
+                type: "text",
+                text: `Draft repair rejected:\n${attemptedExpansion.errors.map((error) => `- ${error}`).join("\n")}\n\nPrevious draft retained. None of this replacement batch was applied. Correct the rejected replacement paths or values.`,
+              }],
+              details: {
+                accepted: false,
+                previous_draft_retained: true,
+                errors: attemptedExpansion.errors,
+                rejected_replacements: structuredClone(params.replacements),
+              },
+            };
+          }
+        }
+        // Semantic failures remain repairable incrementally; only newly unexpandable batches roll back.
+        retainedDraft = attemptedDraft;
         const submission = await submitProductSpecDraftCandidate(JSON.stringify(retainedDraft), idea, fragments, outputFile);
         if (!submission.accepted) {
           return {
