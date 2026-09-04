@@ -224,15 +224,35 @@ export class TransactionStore<State> {
 
   get state(): State { return this.current.state; }
 
+  // Ordinary create/edit/delete/cart changes: every invocation may save a new change.
+  // This does not consume keys or forget earlier explicitly idempotent transactions.
+  update<Value>(
+    prepare: (snapshot: State) => { next: State; value: Value } | { error: string },
+  ): IdempotentTransactionResult<State, Value> {
+    return this.persist<Value>((current) => {
+      const prepared = transact<State, Value>(current.state, prepare);
+      if (!prepared.ok) return { ok: false, envelope: current, error: prepared.error };
+      return { ok: true, envelope: { state: prepared.state, completedKeys: current.completedKeys }, value: prepared.value };
+    });
+  }
+
+  // Once per business intent, e.g. checkout: keep the same key on retry and use a
+  // new key for a genuinely new intent. An operation label is not an intent key.
   commit<Value>(
     idempotencyKey: string,
     prepare: (snapshot: State) => { next: State; value: Value } | { error: string },
+  ): IdempotentTransactionResult<State, Value> {
+    return this.persist<Value>((current) => transactOnce<State, Value>(current, idempotencyKey, prepare));
+  }
+
+  private persist<Value>(
+    prepare: (current: TransactionEnvelope<State>) => IdempotentTransactionResult<State, Value>,
   ): IdempotentTransactionResult<State, Value> {
     if (this.committing) return { ok: false, envelope: this.current, error: "A change is already being processed." };
     this.committing = true;
     try {
       // Validate all mutable preconditions against this latest snapshot inside prepare.
-      const prepared = transactOnce<State, Value>(this.current, idempotencyKey, prepare);
+      const prepared = prepare(this.current);
       if (!prepared.ok) return prepared;
       try { this.repository.save(prepared.envelope); }
       catch { return { ok: false, envelope: this.current, error: "Could not save your changes. Your saved data is unchanged; try again." }; }

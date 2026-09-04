@@ -53,6 +53,8 @@ type Envelope = TransactionEnvelope<State>;
 const repository = new LocalStorageRepository<Envelope>("state", 1, () => ({ state: { capacity: 2 }, completedKeys: [] }),
   (value: unknown): value is Envelope => typeof value === "object" && value !== null && "state" in value && "completedKeys" in value);
 const store = new TransactionStore<State>(repository);
+const updated = store.update<number>(snapshot => ({ next: { capacity: snapshot.capacity + 1 }, value: 1 }));
+if (updated.ok) { const count: number = updated.value; console.log(count, updated.envelope.state.capacity); }
 const result = store.commit<string>("intent", snapshot => {
   if (snapshot.capacity < 1) return { error: "No capacity" };
   const payment = simulatePayment({ amountMinor: 100, mode: "succeed", idempotencyKey: "intent" });
@@ -115,6 +117,54 @@ void [pending, candidate, once];
     expect(store.state).toEqual({ capacity: 2, reserved: 0, allocations: [] });
     expect(rejected.envelope.completedKeys).toEqual(["capacity-edit"]);
     expect(setItem).toHaveBeenCalledTimes(1);
+  });
+
+  it("repeats ordinary saves and failed-save retries without consuming or losing checkout intent keys", async () => {
+    const { store, transaction, repository, saved, setItem } = await materialized();
+    expect(store.commit("checkout-1", reserve(1, "first checkout")).ok).toBe(true);
+    const seenDuringSave: State[] = [];
+    setItem.mockImplementation((key, value) => { seenDuringSave.push(structuredClone(store.state)); saved.set(key, value); });
+    const revise = (capacity: number) => (snapshot: State) => ({ next: { ...snapshot, capacity }, value: capacity });
+    expect(store.update(revise(5))).toMatchObject({ ok: true, value: 5 });
+    expect(store.update(revise(6))).toMatchObject({ ok: true, value: 6 });
+    expect(seenDuringSave.map(state => state.capacity)).toEqual([4, 5]);
+    expect(repository.load()).toEqual({ state: { capacity: 6, reserved: 1, allocations: ["first checkout"] }, completedKeys: ["checkout-1"] });
+    const before = structuredClone(repository.load());
+    setItem.mockImplementationOnce(() => { throw new Error("quota"); });
+    expect(store.update(revise(7))).toMatchObject({ ok: false, error: expect.stringContaining("Could not save") });
+    expect(store.state).toEqual(before.state);
+    expect(repository.load()).toEqual(before);
+    expect(store.update(revise(7))).toMatchObject({ ok: true, value: 7 });
+    const reloaded = new transaction.TransactionStore(repository);
+    expect(reloaded.state.capacity).toBe(7);
+    const duplicate = vi.fn(reserve(1));
+    expect(reloaded.commit("checkout-1", duplicate)).toMatchObject({ ok: false, error: "This transaction was already completed." });
+    expect(duplicate).not.toHaveBeenCalled();
+    expect(reloaded.update(revise(8)).ok).toBe(true);
+    expect(reloaded.commit("checkout-2", reserve(1, "second checkout")).ok).toBe(true);
+    expect(repository.load()).toEqual({ state: { capacity: 8, reserved: 2, allocations: ["first checkout", "second checkout"] }, completedKeys: ["checkout-1", "checkout-2"] });
+  });
+
+  it("shares current-state validation, preparation rollback and reentrancy protection across update and commit", async () => {
+    const { store, setItem } = await materialized();
+    expect(store.update((snapshot: State) => ({ next: { ...snapshot, capacity: 1 }, value: "smaller" })).ok).toBe(true);
+    expect(store.update(reserve(2))).toMatchObject({ ok: false, error: "Insufficient capacity." });
+    const before = structuredClone(store.state);
+    let nested: unknown;
+    expect(store.update((snapshot: State) => {
+      snapshot.allocations.push("must not leak");
+      nested = store.commit("nested-checkout", reserve(1));
+      throw new Error("abort");
+    })).toMatchObject({ ok: false, error: expect.stringContaining("Could not prepare") });
+    expect(nested).toMatchObject({ ok: false, error: "A change is already being processed." });
+    expect(store.state).toEqual(before);
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(store.commit("outer", (snapshot: State) => {
+      nested = store.update(reserve(1)); return { next: snapshot, value: "done" };
+    }).ok).toBe(true);
+    expect(nested).toMatchObject({ ok: false, error: "A change is already being processed." });
+    expect(store.commit("nested-checkout", reserve(1)).ok).toBe(true);
+    expect(store.state.reserved).toBe(1);
   });
 
   it("keeps current state after mutation of a rejected or throwing preparation snapshot", async () => {
