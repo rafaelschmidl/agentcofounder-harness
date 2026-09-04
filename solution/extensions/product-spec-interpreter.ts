@@ -4,7 +4,7 @@ import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { appendPatternRetrievalAudit } from "../../src/patterns/audit.js";
 import { retrievePatterns } from "../../src/patterns/catalog.js";
-import { submitProductSpecDraftCandidate } from "../../src/product-spec/submit.js";
+import { replaceDraftValues, submitProductSpecDraftCandidate } from "../../src/product-spec/submit.js";
 import type { SourceFragment } from "../../src/product-spec/types.js";
 
 function requiredEnvironment(name: string): string {
@@ -49,6 +49,7 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
   const fragmentsFile = requiredEnvironment("SYSTEM_V0_FRAGMENTS_FILE");
   const outputFile = requiredEnvironment("SYSTEM_V0_PRODUCT_SPEC_FILE");
   const patternAuditFile = requiredEnvironment("SYSTEM_V0_PATTERN_AUDIT_FILE");
+  let retainedDraft: unknown;
 
   pi.registerTool(
     defineTool({
@@ -78,27 +79,44 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
     defineTool({
       name: "submit_product_spec",
       label: "Submit ProductSpec",
-      description: "Expand, validate, and save a compact ProductSpec draft. The runner injects hashes, immutable fragments, and exact source ranges. Validation errors are returned for bounded repair.",
+      description: "Expand, validate, and save a ProductSpec draft. Submit draft initially. After rejection, the draft is retained: use replacements with JSON Pointer paths to fix only invalid values instead of resending it. Every repair passes the same full validation.",
       promptSnippet: "Submit a compact semantic ProductSpec draft for deterministic expansion and validation",
       promptGuidelines: [
-        "Use submit_product_spec as the final action. If it returns validation errors, repair only those errors and submit again in the same session.",
+        "Submit draft initially. If rejected, use replacements to fix erroneous values in the retained draft. Supply either draft or replacements, never both.",
       ],
       parameters: Type.Object({
-        draft: Type.Unsafe<unknown>(draftSchema),
+        draft: Type.Optional(Type.Unsafe<unknown>(draftSchema)),
+        replacements: Type.Optional(Type.Array(Type.Object({
+          path: Type.String({ pattern: "^/", description: "JSON Pointer to an existing value, e.g. /requirements/0/source_refs" }),
+          value: Type.Unknown({ description: "Replacement value; the full repaired draft is validated again" }),
+        }), { minItems: 1, maxItems: 32 })),
       }),
       async execute(_toolCallId, params) {
+        try {
+          if (Object.hasOwn(params, "draft") === Object.hasOwn(params, "replacements")) {
+            throw new Error("Supply exactly one of draft or replacements.");
+          }
+          retainedDraft = params.replacements
+            ? replaceDraftValues(retainedDraft, params.replacements)
+            : structuredClone(params.draft);
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Draft repair rejected: ${String(error)}` }],
+            details: { accepted: false },
+          };
+        }
         const [idea, fragmentsJson] = await Promise.all([
           readFile(ideaFile, "utf8"),
           readFile(fragmentsFile, "utf8"),
         ]);
         const fragments = JSON.parse(fragmentsJson) as SourceFragment[];
-        const submission = await submitProductSpecDraftCandidate(JSON.stringify(params.draft), idea, fragments, outputFile);
+        const submission = await submitProductSpecDraftCandidate(JSON.stringify(retainedDraft), idea, fragments, outputFile);
         if (!submission.accepted) {
           return {
             content: [
               {
                 type: "text",
-                text: `ProductSpec rejected:\n${submission.errors.map((error) => `- ${error}`).join("\n")}`,
+                text: `ProductSpec rejected:\n${submission.errors.map((error) => `- ${error}`).join("\n")}\n\nDraft retained. Fix these values with replacements using JSON Pointer paths (for example /requirements/0/source_refs). Do not repeat the full draft for a small correction.`,
               },
             ],
             details: submission,

@@ -19,6 +19,32 @@ export function builderThinkingFromEnvironment(): string {
   return process.env.CHALLENGE_BUILDER_THINKING ?? DEFAULT_BUILDER_THINKING;
 }
 
+/** The builder needs executable meaning, not repeated source quotes and compiler bookkeeping. */
+export function builderExecutionContext(spec: ProductSpec, plan: BuildPlan) {
+  return {
+    product: spec.product,
+    requirements: spec.requirements.map(({ source_refs: _sources, provenance: _provenance, ...requirement }) => requirement),
+    entities: spec.entities,
+    workflows: spec.workflows,
+    persistence: spec.persistence,
+    integrations: spec.integrations,
+    views: spec.views,
+    acceptance_journeys: spec.acceptance_journeys,
+    assumptions: spec.assumptions,
+    exclusions: spec.exclusions,
+    resolved_conflicts: spec.conflicts.map(({ description, resolution }) => ({ description, resolution })),
+    build: {
+      blocks: plan.blocks.map(({ id, config }) => ({ id, config })),
+      custom_slots: plan.custom_slots,
+      owned_paths: plan.file_ownership.filter((entry) => entry.owner === "AGENT").map((entry) => entry.path),
+      routes: plan.routes,
+      exports: plan.exports,
+      verification_obligations: plan.verification_obligations,
+      install_allowed: plan.dependencies.install_allowed,
+    },
+  };
+}
+
 export function buildBuilderPiArguments(
   spec: ProductSpec,
   plan: BuildPlan,
@@ -50,11 +76,9 @@ export function buildBuilderPiArguments(
     "--thinking",
     builderThinkingFromEnvironment(),
     [
-      "## Validated ProductSpec",
-      JSON.stringify(spec, null, 2),
-      "",
-      "## Deterministic BuildPlan",
-      JSON.stringify(plan, null, 2),
+      "## Validated ProductSpec and BuildPlan — execution context",
+      "The complete source-provenance artifacts remain on disk. This projection preserves all product behavior, exclusions, interfaces, and verification obligations needed for implementation.",
+      JSON.stringify(builderExecutionContext(spec, plan)),
       "",
       taskInstruction,
     ].join("\n"),
@@ -131,7 +155,10 @@ export async function loadRepairPrompts(
     readFile(path.join(REPOSITORY_ROOT, "solution", "repair-prompt.md"), "utf8"),
     Promise.all(sourcePaths.map(async (relativePath) => ({
       relativePath,
-      content: await readFile(path.join(outputDirectory, relativePath), "utf8"),
+      content: await readFile(path.join(outputDirectory, relativePath), "utf8").catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return "(This required file is missing. Create it.)";
+        throw error;
+      }),
     }))),
   ]);
   const currentSources = agentSources

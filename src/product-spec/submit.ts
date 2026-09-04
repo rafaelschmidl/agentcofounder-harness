@@ -7,6 +7,38 @@ export interface ProductSpecSubmission extends ProductSpecValidation {
   accepted: boolean;
 }
 
+export interface DraftReplacement {
+  path: string;
+  value: unknown;
+}
+
+/** Apply a small atomic replacement set to a retained semantic draft. Full validation still follows. */
+export function replaceDraftValues(draft: unknown, replacements: DraftReplacement[]): unknown {
+  if (draft === undefined) throw new Error("No draft is retained yet. Submit the complete draft first.");
+  if (replacements.length < 1 || replacements.length > 32) throw new Error("Supply between 1 and 32 replacements.");
+  const next = structuredClone(draft);
+  for (const replacement of replacements) {
+    if (!replacement.path.startsWith("/") || /~(?![01])/u.test(replacement.path)) {
+      throw new Error(`Invalid JSON Pointer: ${replacement.path}`);
+    }
+    const parts = replacement.path.slice(1).split("/").map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"));
+    if (parts.some((part) => ["__proto__", "prototype", "constructor"].includes(part))) {
+      throw new Error(`Unsupported replacement path: ${replacement.path}`);
+    }
+    let parent: unknown = next;
+    for (const [index, part] of parts.entries()) {
+      if (typeof parent !== "object" || parent === null || !Object.hasOwn(parent, part)
+        || (Array.isArray(parent) && !/^(0|[1-9][0-9]*)$/u.test(part))) {
+        throw new Error(`Replacement path does not identify an existing value: ${replacement.path}`);
+      }
+      const object = parent as Record<string, unknown>;
+      if (index === parts.length - 1) object[part] = structuredClone(replacement.value);
+      else parent = object[part];
+    }
+  }
+  return next;
+}
+
 export async function submitProductSpecCandidate(
   specJson: string,
   idea: string,
