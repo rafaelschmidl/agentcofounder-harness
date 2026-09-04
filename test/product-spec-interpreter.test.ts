@@ -19,14 +19,25 @@ describe("ProductSpec interpreter boundary", () => {
     const schema = productSpecDraftSchema() as {
       required: string[];
       properties: Record<string, unknown>;
-      $defs: { sourceReference: Record<string, unknown>; fragmentDisposition: { required: string[] } };
+      $defs: {
+        sourceReference: Record<string, unknown>;
+        fragmentDisposition: { required: string[] };
+        requirement: { required: string[]; properties: Record<string, unknown> };
+      };
     };
     expect(schema.required).not.toContain("source_idea_hash");
     expect(schema.required).not.toContain("source_fragments");
+    expect(schema.required).not.toContain("version");
     expect(schema.properties).not.toHaveProperty("source_idea_hash");
     expect(schema.properties).not.toHaveProperty("source_fragments");
     expect(schema.$defs.sourceReference.type).toBe("string");
     expect(schema.$defs.fragmentDisposition.required).not.toContain("requirement_ids");
+    expect(schema.$defs.requirement.required).not.toContain("disposition");
+    expect(schema.$defs.requirement.required).not.toContain("journey_ids");
+    expect(schema.$defs.requirement.required).toContain("provenance");
+    expect(schema.properties).toHaveProperty("version");
+    expect(schema.$defs.requirement.properties).toHaveProperty("disposition");
+    expect(schema.$defs.requirement.properties).toHaveProperty("journey_ids");
   });
 
   it("enables only offline retrieval and submission tools", () => {

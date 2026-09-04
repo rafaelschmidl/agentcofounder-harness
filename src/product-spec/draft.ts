@@ -12,6 +12,17 @@ function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function dispositionForProvenance(provenance: unknown): unknown {
+  switch (provenance) {
+    case "EXPLICIT":
+    case "IMPLIED":
+    case "DEFAULT": return "IMPLEMENT";
+    case "PROPOSED": return "PROPOSE";
+    case "EXCLUDED": return "EXCLUDE";
+    default: return undefined;
+  }
+}
+
 function expandReferences(
   value: unknown,
   fragments: Map<string, SourceFragment>,
@@ -58,11 +69,16 @@ export function expandProductSpecDraft(
           errors.push(`requirements[${index}] must be an object`);
           return requirement;
         }
+        const provenance = requirement.disposition === "EXCLUDE" && requirement.provenance === "EXPLICIT"
+          ? "EXCLUDED"
+          : requirement.provenance;
         return {
           ...requirement,
-          provenance: requirement.disposition === "EXCLUDE" && requirement.provenance === "EXPLICIT"
-            ? "EXCLUDED"
-            : requirement.provenance,
+          provenance,
+          disposition: Object.hasOwn(requirement, "disposition")
+            ? requirement.disposition
+            : dispositionForProvenance(provenance),
+          journey_ids: Object.hasOwn(requirement, "journey_ids") ? requirement.journey_ids : [],
           source_refs: expandReferences(
             requirement.source_refs,
             fragments,
@@ -91,7 +107,9 @@ export function expandProductSpecDraft(
       })
     : draft.conflicts;
 
-  let acceptanceJourneys = draft.acceptance_journeys;
+  let acceptanceJourneys = Array.isArray(draft.acceptance_journeys)
+    ? draft.acceptance_journeys.map((journey) => isObject(journey) ? { ...journey } : journey)
+    : draft.acceptance_journeys;
   if (Array.isArray(requirements) && Array.isArray(acceptanceJourneys)) {
     const requirementById = new Map(requirements
       .filter((requirement): requirement is JsonObject => isObject(requirement) && typeof requirement.id === "string")
@@ -99,9 +117,10 @@ export function expandProductSpecDraft(
     const journeyById = new Map(acceptanceJourneys
       .filter((journey): journey is JsonObject => isObject(journey) && typeof journey.id === "string")
       .map((journey) => [journey.id as string, journey]));
-    const addUnique = (value: unknown, addition: string): string[] => {
-      const values = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-      return values.includes(addition) ? values : [...values, addition];
+    const addUnique = (value: unknown, addition: string): unknown => {
+      // Preserve explicitly invalid values for canonical validation instead of repairing them away.
+      if (!Array.isArray(value)) return value;
+      return value.includes(addition) ? value : [...value, addition];
     };
     for (const requirement of requirementById.values()) {
       const requirementId = requirement.id as string;
@@ -150,6 +169,7 @@ export function expandProductSpecDraft(
   if (errors.length > 0) return { errors };
   const candidate: ProductSpec = {
     ...(draft as unknown as ProductSpec),
+    ...(Object.hasOwn(draft, "version") ? {} : { version: "0.1" as const }),
     source_idea_hash: hashIdea(idea),
     source_fragments: sourceFragments,
     fragment_disposition: fragmentDisposition as ProductSpec["fragment_disposition"],

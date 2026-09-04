@@ -12,23 +12,23 @@ Your priorities are:
 
 The runner supplies immutable source fragments with exact offsets. Do not copy `source_idea_hash` or `source_fragments` into your draft: the deterministic submit tool injects them. Every fragment needs exactly one `fragment_disposition`, but omit its redundant `requirement_ids`; the runner derives them from requirement source references. In your draft, each requirement or conflict `source_refs` is only an array of referenced fragment ID strings, such as `["fragment-abcd1234abcd-1"]`. The submit tool deterministically expands those IDs into exact full-fragment quotes and ranges. Never calculate offsets yourself.
 
-Use these provenance and disposition pairs:
+Omit `version`, requirement `disposition`, and requirement `journey_ids` from the draft. The runner supplies version `0.1`, derives requirement journey IDs from each acceptance journey's `requirement_ids`, and derives disposition from provenance:
 
 - EXPLICIT, IMPLIED, or DEFAULT -> IMPLEMENT
 - PROPOSED -> PROPOSE
 - EXCLUDED -> EXCLUDE
 
-An explicit negative such as "no login" uses EXCLUDED provenance and EXCLUDE disposition; do not label it EXPLICIT.
+An explicit negative such as "no login" uses EXCLUDED provenance; do not label it EXPLICIT.
 
-Every IMPLEMENT requirement must map bidirectionally to at least one acceptance journey. PROPOSE and EXCLUDE requirements must not map to journeys. DEFAULT requirements must not claim source references.
+Every implemented requirement must appear in at least one acceptance journey's `requirement_ids`. PROPOSED and EXCLUDED requirements must not map to journeys. DEFAULT requirements must not claim source references. The saved ProductSpec retains the full bidirectional mappings.
 
 Make exactly one compact `retrieve_patterns` call with a limit no greater than 6 before drafting. Only include versioned IDs actually returned by that call in `selected_patterns`. A pattern is supporting product knowledge, not permission to add unrelated scope.
 
-The compact draft contains every ProductSpec v0.1 field except `source_idea_hash` and `source_fragments`:
+The compact draft contains the semantic ProductSpec v0.1 fields, with the deterministic fields above omitted:
 
-- `version` and `fragment_disposition`;
+- `fragment_disposition`, including each fragment's classification and note;
 - `product` with summary, actors, goals, and constraints;
-- requirements with kind, provenance, disposition, source references, and journey IDs;
+- requirements with kind, provenance, and source references;
 - entities with typed fields, relationships, and validation;
 - workflows with states, transitions, guards, effects, and invariants;
 - persistence and integration needs;
@@ -45,3 +45,5 @@ Choose the working view from the information and task, separately from its visua
 After that single pattern retrieval, immediately call `submit_product_spec` with the compact draft object in its `draft` argument. Its tool schema is authoritative for required fields and uppercase enum values. Do not narrate, pre-draft in reasoning, calculate offsets, repeat the source text, encode the draft as a JSON string, or emit hidden fields. Keep the complete tool call below 3,500 output tokens.
 
 If rejected, the tool retains your draft. Correct the returned errors with `replacements`, a list of JSON Pointer paths and replacement values, instead of emitting the full draft again. For example, use `{"replacements":[{"path":"/requirements/2/source_refs","value":[]}]}` to remove an invalid source claim from one default requirement. Replace existing values only; you may replace an entire array when needed. Supply either `draft` or `replacements` in a call, never both. Every repaired draft still passes the complete schema and meaning validation.
+
+For errors in a derived disposition or journey mapping, repair the requirement's `provenance` or the acceptance journey's `requirement_ids`; do not target an omitted field.

@@ -23,7 +23,7 @@ export function productSpecDraftSchema(): Record<string, unknown> {
     [key: string]: unknown;
   };
   schema.required = schema.required.filter(
-    (field) => field !== "source_idea_hash" && field !== "source_fragments",
+    (field) => !["source_idea_hash", "source_fragments", "version"].includes(field),
   );
   delete schema.properties.source_idea_hash;
   delete schema.properties.source_fragments;
@@ -35,6 +35,10 @@ export function productSpecDraftSchema(): Record<string, unknown> {
   const disposition = schema.$defs.fragmentDisposition as { required?: string[] } | undefined;
   if (disposition?.required) {
     disposition.required = disposition.required.filter((field) => field !== "requirement_ids");
+  }
+  const requirement = schema.$defs.requirement as { required?: string[] } | undefined;
+  if (requirement?.required) {
+    requirement.required = requirement.required.filter((field) => !["disposition", "journey_ids"].includes(field));
   }
   delete schema.$schema;
   delete schema.$id;
