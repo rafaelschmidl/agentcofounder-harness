@@ -22,6 +22,14 @@ CompileKit's explicit capability routing reinforces measuring where our optional
 
 Our current experiment shares dependable collection behavior while leaving product JSX and CSS generated. Hand-authored Book/Garden examples establish that this permits distinct composition, not that fresh generation achieves it. Fresh generated outputs, independent journeys, and desktop/mobile review decide adoption.
 
+## Findings from the next retained run
+
+The `af788045b23c` Book generation completed with 31 model calls, 26,980 output tokens and 0.093396 Pi-reported cost. It therefore does not establish a token-efficiency improvement. Its repair loop exposed two avoidable causes: test fixtures did not clear real browser storage, and a 300-character limit rejected otherwise valid repair handoffs. Changing only the compiled test setup in a disposable reconstruction changed the generated tests from three passing / three failing to six passing / zero failing, without altering assertions or product behavior. The new setup isolates tests while preserving persistence across unmount/remount within one journey. The completion tool now accepts a detailed summary without requiring another shortening round.
+
+The retained app's original independent evaluation failed because its vocabulary differed from evaluator selectors (for example, `Confirm lend` versus `Confirm lending`). An adapter-only replay of the unchanged app completes all nine journeys with clean browser observations. Original failures remain retained. Visually it improves on the earlier tall, awkward record layout, but its warm card grid is still a modest product treatment; passing journeys do not establish exceptional design.
+
+The bounded provider probe made two live requests before stopping. SDK thinking off produced a final response with 29 output tokens and reported cost 0.000150. SDK high produced a visible reasoning stream but reached the probe's 90-second timeout before final usage or an answer arrived. Thus Berget demonstrably distinguishes these controls, and an extra chat-template flag is not justified by a presumed ignored SDK setting. The remaining two planned arms were not run. This tiny puzzle is not an app-quality benchmark, and the timed-out request's unavailable usage must remain explicitly unmeasured in budget accounting. A full application comparison needs an adequate execution allowance and complete usage evidence.
+
 ## Deterministic draft fields
 
 The interpreter may now omit draft `version`, requirement `disposition`, and requirement `journey_ids`. Expansion supplies version 0.1, derives disposition from provenance, and reconstructs reciprocal journey links from acceptance journeys. Existing full drafts remain supported. Explicit invalid values remain visible to the unchanged canonical schema and semantic validator. Source provenance, fragment classifications and notes, experience briefs, and acceptance outcomes remain model-authored.
