@@ -1,0 +1,26 @@
+{
+  "id": "website.strategy.booking-appointments@1.0.0",
+  "title": "Booking and appointment scheduling website",
+  "summary": "A site whose job is to convert visitors into confirmed bookings: real service availability on a calendar, a booking form, an explicit confirmation state, and self-service reschedule and cancellation.",
+  "signals": ["booking", "book now", "appointment", "schedule", "scheduling", "calendar", "slot", "time slot", "availability", "reschedule", "cancel", "reminder", "provider", "walk-in", "confirm booking"],
+  "capabilities": ["availability-calendar", "slot-picker", "booking-form", "confirmation-state", "reschedule-cancel", "provider-schedule"],
+  "defaults": ["Show real availability with a date and time-slot picker, not a contact form", "Always end a booking in an explicit confirmation state", "Keep reschedule and cancel as first-class self-service actions"],
+  "risks": ["Booking reduced to a plain contact form", "No confirmation state after booking", "Missing reschedule or cancel path"],
+  "verification": ["Pick an open time slot and confirm a booking", "Reschedule or cancel from the my-bookings view", "See the provider schedule reflect the confirmed booking"],
+  "site_goals": ["Convert visitors into confirmed bookings", "Minimize back-and-forth by showing real-time availability", "Reduce no-shows with reminders and a clear cancellation policy"],
+  "typical_views": [
+    {"name": "Services list", "purpose": "Show what services or providers are offered with a primary book-now action"},
+    {"name": "Service or provider detail", "purpose": "Describe duration, price, and open time slots for one offering"},
+    {"name": "Booking calendar", "purpose": "Pick a date and open time slot and enter customer details"},
+    {"name": "Booking confirmation", "purpose": "Confirm the appointment with its summary, add-to-calendar, and cancellation option"},
+    {"name": "My bookings", "purpose": "Let customers view, reschedule, or cancel upcoming appointments"},
+    {"name": "Provider schedule", "purpose": "Let the provider see and manage upcoming appointments"}
+  ],
+  "common_components": ["calendar date picker with open vs. blocked slots", "service card with duration and price", "booking form", "confirmation summary with add-to-calendar", "reschedule and cancel links", "reminder indicator"],
+  "example_startups": [
+    {"name": "Calendly", "note": "Pure scheduling-link product: every visit funnels toward booking a slot"},
+    {"name": "OpenTable", "note": "Party size, date/time, and instant confirmation as the core flow"},
+    {"name": "Cal.com", "note": "Self-hosted booking pages per provider sharing the scheduling pattern"},
+    {"name": "Booksy", "note": "Service catalog combined with per-provider time slots"}
+  ]
+}
