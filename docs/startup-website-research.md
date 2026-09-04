@@ -4,7 +4,7 @@ Last updated: 2026-09-04. Companion prompts: [`startup-website-research-prompt.m
 
 Purpose: source material for the `website.strategy.*` pattern cards in `solution/patterns/cards/`. Each category below records the site's goals in priority order, typical views with purposes, recurring components, category vocabulary (used as card `signals`), and example startups. This is pattern-level distilled knowledge: cards stay ~2 KB, so only the essentials survive into them.
 
-Method: pattern analysis of well-known reference startups' websites (goals → page inventory → recurring components → vocabulary), biased toward what a competent small-scale MVP shows, not enterprise site maps. Enriched 2026-09-04 with the external research report (`../Startup-web-lib-report.md`, with cited UX/conversion sources).
+Method: pattern analysis of well-known reference startups' websites (goals → page inventory → recurring components → vocabulary), biased toward what a competent small-scale MVP shows, not enterprise site maps. Enriched 2026-09-04 with the external research report (`startup-website-research-v2.md`, with cited UX/conversion sources).
 
 ## Cross-category discriminators (external report finding)
 
