@@ -12,8 +12,11 @@ import { segmentIdea } from '../src/product-spec/fragments.js';
 import { SAMPLE_IDEA, validProductSpec } from './fixtures/product-spec.js';
 
 afterEach(() => vi.unstubAllEnvs());
+function canonicalFixture() {
+  return { ...validProductSpec(), collection_execution: { mode: 'custom' as const, reason: 'Exercise explicit custom generation with the canonical note scope.' } };
+}
 function draftFixture() {
-  const { source_idea_hash: _hash, source_fragments: _fragments, ...draft } = validProductSpec();
+  const { source_idea_hash: _hash, source_fragments: _fragments, ...draft } = canonicalFixture();
   return { ...draft, requirements: draft.requirements.map((requirement) => ({ ...requirement, source_refs: requirement.source_refs.map((ref) => ref.fragment_id) })) };
 }
 
@@ -42,7 +45,7 @@ describe('exact root container normalization', () => {
       const prepared = tool.prepareArguments({ draft: raw });
       const validated = validateToolArguments(tool, { type: 'toolCall', id: 'initial', name: tool.name, arguments: prepared });
       expect((await tool.execute('initial', validated)).details.accepted).toBe(true);
-      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(validProductSpec());
+      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(canonicalFixture());
       expect(raw).toEqual(original);
       const audit = JSON.parse(await readFile(join(directory, 'draft-normalization.jsonl'), 'utf8'));
       expect(audit.raw_draft).toEqual(original);

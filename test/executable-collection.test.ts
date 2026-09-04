@@ -19,7 +19,7 @@ import { publicCollectionSpec, BOOK_IDEA, SAAS_IDEA } from './fixtures/executabl
 afterEach(() => vi.unstubAllEnvs());
 const run = promisify(execFile);
 
-describe('opt-in executable collections', () => {
+describe('executable collections', () => {
   it.each(['book','saas'] as const)('validates the full public %s spec, while default/custom paths keep four agent files', (kind) => {
     const spec = publicCollectionSpec(kind);
     expect(validateProductSpec(spec, kind === 'book' ? BOOK_IDEA : SAAS_IDEA).errors).toEqual([]);
@@ -28,7 +28,9 @@ describe('opt-in executable collections', () => {
     expect(compileProductSpec(spec, { executableCollection: true }).file_ownership.filter((file) => file.owner === 'AGENT')).toHaveLength(4);
   });
 
-  it('makes contract choice explicit only in the opt-in tool schema and keeps closed validation', () => {
+  it('makes contract choice explicit by default, permits disabling it, and keeps closed validation', () => {
+    vi.stubEnv('CHALLENGE_EXECUTABLE_COLLECTION', undefined);
+    expect(productSpecDraftSchema().required).toContain('collection_execution');
     vi.stubEnv('CHALLENGE_EXECUTABLE_COLLECTION', '0');
     expect((productSpecDraftSchema().properties as Record<string, unknown>).collection_execution).toBeUndefined();
     vi.stubEnv('CHALLENGE_EXECUTABLE_COLLECTION', '1');

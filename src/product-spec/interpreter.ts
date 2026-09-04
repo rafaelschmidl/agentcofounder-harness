@@ -11,7 +11,7 @@ import { executableCollectionEnabled } from "../executable-collection/types.js";
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "../..");
-export const DEFAULT_INTERPRETER_THINKING = "off";
+export const DEFAULT_INTERPRETER_THINKING = "high";
 const EXECUTABLE_COLLECTION_INSTRUCTION = `
 
 ## Executable collection
@@ -109,7 +109,7 @@ export async function runProductSpecInterpretation(
   ]);
 
   const environment = await createPiEnvironment(artifactDirectory, {
-    CHALLENGE_EXECUTABLE_COLLECTION: executableCollectionEnabled() ? "1" : undefined,
+    CHALLENGE_EXECUTABLE_COLLECTION: executableCollectionEnabled() ? "1" : "0",
     SYSTEM_V0_IDEA_FILE: files.idea,
     SYSTEM_V0_FRAGMENTS_FILE: files.fragments,
     SYSTEM_V0_PRODUCT_SPEC_FILE: files.productSpec,

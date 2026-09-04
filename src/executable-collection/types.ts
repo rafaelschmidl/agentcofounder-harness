@@ -6,5 +6,5 @@ export type CollectionExecution = { mode: 'custom'; reason: string } | {
 };
 
 export function executableCollectionEnabled(): boolean {
-  return process.env.CHALLENGE_EXECUTABLE_COLLECTION === '1';
+  return (process.env.CHALLENGE_EXECUTABLE_COLLECTION ?? '1') === '1';
 }

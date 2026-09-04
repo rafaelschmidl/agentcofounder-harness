@@ -1,29 +1,14 @@
-# AgentCofounder starter
+# AgentCofounder harness
 
-A forkable baseline for the AgentCofounder challenge. It gives every team the same pinned Pi runtime, neutral web application seed, execution command, telemetry collector, and public contract while leaving the actual agent strategy participant-owned.
+Turn a raw startup idea into a local React application with retained requirements, generated source, verification results, and model-usage evidence. The harness interprets the idea into a validated ProductSpec, compiles a BuildPlan and shared runtime blocks, generates the product files, then verifies and repairs observed failures.
 
-This repository installs Pi as a local dependency at exactly `@earendil-works/pi-coding-agent@0.84.1`. Do not use the floating shell installer and do not run `pi update` during the challenge.
+Generation uses **GLM-5.2 through Berget** by default. Pi is pinned to `@earendil-works/pi-coding-agent@0.84.1`; the Berget provider is pinned to `@bergetai/pi-provider@0.3.2`. Interpretation, generation, and repair run as separate Pi invocations with individual logs.
 
-## Repository boundary
+## Native setup
 
-- `solution/` is the main participant surface: change the prompt, extension, skill, or replace the runner strategy.
-- `app-template/` is the neutral application seed copied into a fresh generated workspace for every run.
-- `contract-public/` contains the replaceable public idea, domain-neutral journey guidance, and the result schema.
-- `src/` is the baseline runner and auditable result assembly.
-- `output/app/` is disposable generated application code and is reset before every run.
-- `artifacts/runs/` contains Pi JSON events, session JSONL files, stderr, and the run input.
+Use **Node.js 22.19.0 and npm 10.9.3**. Both package manifests require Node `>=22.19.0 <23`, and `.nvmrc` pins the development version. With mise, prefix npm commands with `mise exec node@22.19.0 --`.
 
-Official hidden prompts, hidden tests, model credentials, and final scoring code must remain outside participant repositories.
-
-> **Organizer release requirement:** `contract-public/development-idea.txt` is a development placeholder. Replace it with the finalized public prompt before sharing this repository with participants. Never place hidden judging material in this file.
-
-## Prerequisites
-
-- Node.js 22.19.x. The repository deliberately rejects other major versions.
-- npm 10.9.3, matching the committed lockfiles and container image.
-- Provider authentication supported by Pi, or organizer-provided provider/model environment variables.
-
-## Setup
+From the repository root:
 
 ```bash
 npm ci --ignore-scripts
@@ -31,89 +16,106 @@ npm --prefix app-template ci --ignore-scripts
 npm run check
 ```
 
-Provider-specific credentials are read by Pi. The optional challenge variables select the organizer's runtime configuration:
+`npm run check` runs typechecking, harness tests, template tests, and the template build without paid model calls.
 
-```bash
-export CHALLENGE_PROVIDER="provider-name"
-export CHALLENGE_MODEL="model-id"
-export CHALLENGE_THINKING="high"
-export CHALLENGE_BUILDER_THINKING="off"
-```
+Provide `BERGET_API_KEY` in the shell environment or an untracked `.env.local`. The `challenge` script loads `.env.local` when present; it does not load `.env`. Leave optional provider/model variables unset to use the defaults below. Never commit credentials.
 
-Never commit credentials. `.env.example` documents variable names, but the runner intentionally does not load `.env` files.
-
-The current development defaults target Berget `zai-org/GLM-5.2` with its supported `off` thinking mode for direct structured submission, code generation, and diagnosed repair. GLM-5.2 exposes `off`, `high`, and `max`; unsupported intermediate labels are avoided. All values remain configurable through `CHALLENGE_THINKING`, `CHALLENGE_INTERPRETER_THINKING`, and `CHALLENGE_BUILDER_THINKING`. The evaluator retains both Pi-reported cost and the website's weighted-token metric because organizers have not reconciled their newer cost guidance with the published ranking text.
-
-`CHALLENGE_MAX_OUTPUT_TOKENS` sets the per-response output cap, including thinking tokens: default `32768`, valid integer range `1..32768` for the installed GLM-5.2 configuration. This is a ceiling, not a generation target: retained public runs needed 9,532 tokens for a complete compiled SaaS batch and 17,083 for a custom Book batch, while an 8,192-token response truncated its writes. Lower caps remain available for experiments. `npm run challenge -- --print-run-limits` validates and prints the resolved cap and the 32-response output envelope without preparing an app or invoking Pi. The same values configure every stage's Pi model and are retained in `artifacts/run-limits.json` and the run trace.
-
-`CHALLENGE_EXECUTABLE_COLLECTION=1` enables the optional [executable collection experiment](docs/final-push/executable-collection-experiment.md). Supported flat local domains are compiled from a validated contract while JSX, CSS and independent journey tests remain generated; unsupported products select explicit custom generation. The default remains off.
-
-The strict Node engine is intentional. `npm ci` fails on Node 23+ (including Node 26); use `.nvmrc` or the provided container rather than regenerating the lockfile with a newer runtime.
-
-The Docker build runs the full check suite, including short-lived Vite servers over the builder's loopback interface. The image declares port 3000 for organizer-controlled browser evaluation; publishing that port still requires an explicit container port mapping or shared container network.
-
-## Run the public challenge
-
-The runner uses `contract-public/development-idea.txt` by default. During template development it contains a placeholder; organizers must replace that file with the finalized public prompt before participant distribution.
+## Generate and run an app
 
 ```bash
 npm run challenge
 ```
 
-Use `--idea-file /path/to/idea.txt` to override the default for organizer testing or hidden evaluation.
+The default input is the public Book Lending idea in `contract-public/development-idea.txt`. Supply another idea without modifying the harness:
 
-For a setup-only check that does not call a model:
+```bash
+npm run challenge -- --idea-file /absolute/path/to/idea.txt
+```
+
+Each run resets the managed `output/app/` workspace. Use `--output-dir output/my-run` to select another directory beneath `output/`. A directory without the harness's ownership marker will not be reset.
+
+To prepare the app and dependencies without invoking a model:
 
 ```bash
 npm run challenge -- --prepare-only
 ```
 
-After a complete run:
+After generation, from the repository root:
 
 ```bash
-cd output/app
-npm run dev
+npm --prefix output/app run dev
 ```
 
-The app must be available at `http://localhost:3000`. In another terminal, validate the machine-readable result:
+The application serves at **http://localhost:3000**. The harness's temporary verification server is stopped before it returns. To run the app's tests and validate its report:
 
 ```bash
+npm --prefix output/app test
 npm run validate:result -- output/app/result.json
 ```
 
-Native development can use `--verification-port <port>` to probe an isolated temporary server on a different port. The runner uses that port for its listener audit, verification, and cleanup, and records the actual command in `harness_checks`. The generated app scripts, `app_url`, and delivered `start_command` retain the organizer's port 3000 contract. Leave this option unset for final contract validation.
+## Generation modes
 
-## Result and telemetry ownership
+The current candidate enables compiled collection semantics, with **high** interpreter thinking and **off** builder thinking. Supported flat collections get a compiler-owned domain while their React UI, CSS, and journey tests remain generated. Unsupported products use custom domain generation. This configuration is selected for fresh qualification; it is not yet a fully validated final result.
 
-The model writes `report.partial.json`, containing the product summary, assumptions, features, and tests. The runner writes `result.json` after parsing Pi's completed `message_end` events. This prevents the model from inventing headline token totals.
+| Setting | Behavior |
+| --- | --- |
+| `CHALLENGE_EXECUTABLE_COLLECTION` | Defaults to `1`. The interpreter may choose a validated contract for one supported flat local collection. The compiler owns its domain implementation; the model generates its UI, CSS, and journey tests. Unsupported products retain explicit custom generation. Set `0` to disable this mode. |
+| `CHALLENGE_COMPILED_UI_JOURNEYS=1` together with the collection flag | Opt-in; defaults off. For a compiled collection, the model supplies a typed interaction manifest alongside freely composed UI/CSS. The compiler emits immutable interaction tests; unsupported journey coverage remains visible. Custom products keep the ordinary generation path. |
+| `CHALLENGE_SEMANTIC_REVIEW=1` | Optional source review after functional checks. Findings are repair hypotheses, not independent acceptance certification. Defaults off. |
 
-The runner appends the canonical domain-neutral journey guidance from `contract-public/journeys.md` to Pi's built-in system prompt. The protected-paths extension removes only Pi's documentation-reference block, retaining its tool list and usage guidance without steering the model toward package internals. The challenge guidance prevents implied behaviors from being dropped for simplicity while explicitly rejecting unrelated substitute features; the input idea remains authoritative.
+The selected candidate's explicit equivalent of the default command is:
 
-The runner independently executes the pinned Vitest binary, requires at least one completed passing test with no skipped or todo tests, runs `npm run build`, starts the application, probes the published `http://localhost:3000` URL only while the spawned server is alive, and terminates the full process group. Product-journey records remain in the specification-defined `tests_run` field; `success` requires at least one such journey and no failed entries. Independent Vitest, build, and startup evidence is recorded in `harness_checks`. The runner also owns `app_url` and a location-aware `start_command`, so harmless formatting differences in the partial report cannot invalidate a run.
+```bash
+CHALLENGE_EXECUTABLE_COLLECTION=1 CHALLENGE_COMPILED_UI_JOURNEYS=0 CHALLENGE_INTERPRETER_THINKING=high CHALLENGE_BUILDER_THINKING=off npm run challenge -- --idea-file /absolute/path/to/idea.txt
+```
 
-The runner records whether port 3000 was occupied before Pi starts. If Pi leaves a listener behind, cleanup only targets same-user listener processes whose working directory is the generated app; Linux uses `/proc`, while macOS uses bounded, non-blocking `lsof` calls. A listener that predates Pi is never reclaimed. The `port_reclamation` result field records whether cleanup was considered, attempted, and successful, plus the affected process IDs.
+Canonical requirements and explicit fallback reasons are retained as artifacts. Passing generated or compiled tests does not establish complete fidelity to the original idea; independent product journeys and visual review remain necessary.
 
-A provisional result is written before app verification starts. Verification failures degrade a completed model run to `partial`; Pi startup or telemetry failures remain `failed`. Equivalent final results are emitted at the generated app root (`output/app/result.json`) and repository root (`result.json`); only `start_command` differs so each command works from the directory containing its result. Failure to write either required destination makes the harness exit non-zero. Port 3000 must be free on both IPv4 and IPv6 loopback addresses before verification begins.
+## Runtime controls
 
-The raw event stream and Pi session files are retained for audit. Official judging must independently recompute usage and compare it with `result.json`; the participant-controlled report is never the final scoring authority.
+| Variable | Current default |
+| --- | --- |
+| `CHALLENGE_PROVIDER` | `berget` |
+| `CHALLENGE_MODEL` | `zai-org/GLM-5.2` |
+| `CHALLENGE_INTERPRETER_THINKING` | `CHALLENGE_THINKING` when set, otherwise `high`; explicit `off` remains supported |
+| `CHALLENGE_BUILDER_THINKING` | `off`, used for generation and repair independently of interpreter thinking |
+| `CHALLENGE_MAX_OUTPUT_TOKENS` | `32768` per response, including reasoning; accepted range `1..32768` |
+| `CHALLENGE_TIMEOUT_MS` | `5400000` milliseconds (90 minutes) for the run |
 
-`reasoning_tokens` and `cost_total` are included as additional audit fields. No efficiency score is calculated here because the public specification must first define the cache-write weighting and whether ranking uses the custom token formula or Pi's monetary cost.
+The harness allows up to 32 model responses and seven repair cycles, stopping earlier on success, exhausted limits, or an unchanged completed repair diagnosis. These are harness controls, not claims about organizer time limits or scoring weights.
 
-## Develop the harness
+```bash
+npm run challenge -- --print-run-limits
+npm run challenge -- --help
+```
 
-The starter deliberately makes one autonomous Pi invocation. Possible participant improvements include:
+The limits command validates and prints the response envelope without preparing an app or invoking Pi. Native development can use `--verification-port 3111` for temporary verification; the delivered app URL and start command still target port 3000.
 
-- a shorter or more reliable prompt;
-- specialized extensions or tools;
-- reusable but domain-neutral application primitives;
-- test-and-repair orchestration;
-- deliberate prompt caching;
-- a different Pi integration through its SDK or RPC mode.
+## Results and retained evidence
 
-Do not add a challenge idea's domain vocabulary or expected records to reusable code. The official judging idea will be different.
+The runner owns both `report.partial.json` and the final `result.json`. Product claims are derived from observed journey verification; the model does not supply headline usage totals.
 
-## Security
+- `output/app/`: generated source, `idea_spec.json`, `build_plan.json`, `file_ownership.json`, `report.partial.json`, `result.json`, and `trace.jsonl`.
+- Repository-root `result.json`: the same result with a start command appropriate to the repository root. The app-root result uses `npm run dev`.
+- `artifacts/runs/<run-id>/`: source input, stage traces, raw Pi events and sessions, provider-request metadata, verification logs, repair evidence, and source checkpoints.
+- `artifacts/run-limits.json`: resolved response limits. Compiled interaction mode also retains its manifest and `compiled-ui-coverage.json` in the generated app.
 
-Pi and participant extensions execute with the permissions of the current process. The included extension rejects direct `write` and `edit` calls outside the generated app, but shell commands and symlink tricks can bypass an in-process guard. It is not a sandbox. Official evaluation must run each frozen submission in an isolated container or VM with a read-only harness mount and bounded CPU, memory, disk, time, and network access.
+Reports include status, summary, implemented features, assumptions, journey tests, harness checks, token totals, Pi-reported cost, and a per-call usage log. Usage totals are assembled from retained Pi events across all stages; interrupted requests require reconciliation against raw request evidence, not an assumption of zero cost.
 
-See `docs/organizer-checklist.md` before publishing the template or running a judged submission.
+`success` requires completed passing journey evidence plus successful harness verification. Failed checks produce `partial` or `failed` and a nonzero process exit. If a repair breaks a previously buildable, startable app, the harness can restore its exact source checkpoint while retaining the regression and failed acceptance evidence. A restored app is not automatically successful.
+
+## Runtime portability
+
+Development and validation run natively on macOS. The pinned lockfiles include Linux ARM64 packages, and a Dockerfile is included, but the current candidate has not yet completed Linux ARM64 or restricted-network packaging validation.
+
+The default challenge recreates app dependencies with `npm ci --ignore-scripts --prefer-offline`. In a runtime that only permits provider traffic, those packages must already be available in its npm cache. The existing Dockerfile installs root/template dependencies and warms that cache at build time. Generated applications should use bundled assets and local interfaces rather than depend on runtime access to external fonts or services.
+
+## Source map
+
+- `src/product-spec/`: interpretation, provenance, validation, and retained draft repair.
+- `src/build-plan/` and `src/executable-collection/`: compilation, shared runtime, ownership, and optional compiled domain/interaction tests.
+- `solution/`: generation and repair prompts, Pi extensions, and offline product/design knowledge.
+- `app-template/`: pinned React/Vite application seed.
+- `contract-public/`: public input, journey guidance, and result schema. Evaluation ideas can be supplied externally through `--idea-file`.
+
+Generated code and Pi extensions execute with the current process's permissions. File-ownership guards constrain the workflow; they are not an operating-system sandbox.

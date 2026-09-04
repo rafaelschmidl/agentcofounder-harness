@@ -36,8 +36,11 @@ async function fixture(run: (context: { submit: (args: Record<string, unknown>) 
   } finally { await rm(directory, { recursive: true, force: true }); }
 }
 
+function canonicalFixture() {
+  return { ...validProductSpec(), collection_execution: { mode: 'custom' as const, reason: 'Exercise explicit custom generation with the canonical note scope.' } };
+}
 function draftFixture() {
-  const { source_idea_hash: _hash, source_fragments: _fragments, ...draft } = validProductSpec();
+  const { source_idea_hash: _hash, source_fragments: _fragments, ...draft } = canonicalFixture();
   return { ...draft, requirements: draft.requirements.map((requirement) => ({ ...requirement, source_refs: requirement.source_refs.map((ref) => ref.fragment_id) })) };
 }
 
@@ -56,7 +59,7 @@ describe('atomic retention of expandable drafts', () => {
       expect(rejected.content[0]!.text).toContain('Previous draft retained. None of this replacement batch was applied.');
       await expect(access(output)).rejects.toMatchObject({ code: 'ENOENT' });
       expect((await submit({ replacements: [{ path: '/acceptance_journeys/0/actor_id', value: 'actor_owner' }] })).details.accepted).toBe(true);
-      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(validProductSpec());
+      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(canonicalFixture());
     });
   });
 
@@ -70,7 +73,7 @@ describe('atomic retention of expandable drafts', () => {
       expect(partial.details.accepted).toBe(false);
       expect(partial.details.previous_draft_retained).toBeUndefined();
       expect((await submit({ replacements: [{ path: '/acceptance_journeys/1/actor_id', value: 'actor_owner' }] })).details.accepted).toBe(true);
-      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(validProductSpec());
+      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(canonicalFixture());
     });
   });
 
@@ -85,7 +88,7 @@ describe('atomic retention of expandable drafts', () => {
       expect(partial.details.accepted).toBe(false);
       expect(partial.details.previous_draft_retained).toBeUndefined();
       expect((await submit({ replacements: [{ path: '/acceptance_journeys/0/actor_id', value: 'actor_owner' }] })).details.accepted).toBe(true);
-      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(validProductSpec());
+      expect(JSON.parse(await readFile(output, 'utf8'))).toEqual(canonicalFixture());
     });
   });
 });

@@ -146,12 +146,13 @@ Options:
 Environment:
   CHALLENGE_PROVIDER      Optional Pi provider override
   CHALLENGE_MODEL         Optional Pi model override
-  CHALLENGE_THINKING      Optional Pi thinking level (default: off)
+  CHALLENGE_THINKING      Fallback interpreter thinking level (default: high)
+  CHALLENGE_INTERPRETER_THINKING Optional interpreter override (default: CHALLENGE_THINKING or high)
   CHALLENGE_BUILDER_THINKING Optional builder thinking level (default: off)
   CHALLENGE_MAX_OUTPUT_TOKENS Per-response output cap, including reasoning (default: 32768; maximum: 32768)
-  CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 1800000)
+  CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 5400000)
   CHALLENGE_SEMANTIC_REVIEW Set to 1 for an experimental source review after functional checks (default: off)
-  CHALLENGE_EXECUTABLE_COLLECTION Set to 1 for experimental compiler-owned collection semantics (default: off)
+  CHALLENGE_EXECUTABLE_COLLECTION Compiler-owned supported collection semantics; set to 0 for custom generation (default: 1)
   CHALLENGE_COMPILED_UI_JOURNEYS Set to 1 with executable collection for compiled typed interaction tests (default: off)
 `);
 }
@@ -250,8 +251,8 @@ export function buildPiArguments(
   return args;
 }
 
-function timeoutFromEnvironment(): number {
-  const raw = process.env.CHALLENGE_TIMEOUT_MS ?? "1800000";
+export function timeoutFromEnvironment(): number {
+  const raw = process.env.CHALLENGE_TIMEOUT_MS ?? "5400000";
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < 1_000) {
     throw new Error("CHALLENGE_TIMEOUT_MS must be an integer of at least 1000");

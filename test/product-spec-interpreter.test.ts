@@ -65,7 +65,7 @@ describe("ProductSpec interpreter boundary", () => {
       expect(args[args.indexOf("--provider") + 1]).toBe("berget");
       expect(args[args.indexOf("--model") + 1]).toBe("berget/zai-org/GLM-5.2");
       expect(args.join(" ")).toContain("solution/extensions/berget-provider.ts");
-      expect(args[args.indexOf("--thinking") + 1]).toBe("off");
+      expect(args[args.indexOf("--thinking") + 1]).toBe("high");
       expect(args.join(" ")).not.toContain("protected-paths.ts");
     } finally {
       if (previous.provider === undefined) delete process.env.CHALLENGE_PROVIDER;

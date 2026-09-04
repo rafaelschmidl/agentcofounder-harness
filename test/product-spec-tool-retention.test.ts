@@ -32,6 +32,7 @@ it("repairs a draft rejected by Pi's schema without resending it or bypassing va
       };
     expect(tool.executionMode).toBe("sequential");
     const spec = validProductSpec();
+    spec.collection_execution = { mode: "custom", reason: "Exercise explicit custom generation with the canonical note scope." };
     const { source_idea_hash: _hash, source_fragments: _sourceFragments, ...semantic } = spec;
     const draft = {
       ...semantic,
