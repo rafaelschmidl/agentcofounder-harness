@@ -9,13 +9,14 @@ import type { FileOwnership } from "../src/build-plan/types.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 type Write = { path: string; content: string };
-type ToolCall = Write | { name: "edit" | "finish_repair"; arguments: Record<string, string> };
+type ToolCall = Write | { name: "edit" | "finish_repair" | "read"; arguments: Record<string, string> };
 type Response = ToolCall[] | "stop";
 
 /** Real installed Pi, its built-in write implementation, and a local HTTP provider. */
 async function runFixture(options: {
   files: string[];
   repair?: boolean;
+  read?: boolean;
   prepare?: (app: string) => Promise<void>;
   response: (request: number, app: string) => Promise<Response> | Response;
 }) {
@@ -79,7 +80,7 @@ async function runFixture(options: {
     } }));
     const child = spawn(path.join(root, "node_modules/.bin/pi"), [
       "--mode", "json", "--print", "--offline", "--no-extensions", "--no-skills",
-      "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", options.repair ? "write,edit,finish_repair" : "write",
+      "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", (options.read ? "read," : "") + (options.repair ? "write,edit,finish_repair" : "write"),
       "--provider", "fixture", "--model", "fixture", "--thinking", "off",
       "--extension", path.join(root, "solution/extensions/owned-paths.ts"),
       ...(options.repair ? ["--extension", path.join(root, "solution/extensions/repair-completion.ts")] : []),
@@ -156,15 +157,56 @@ it("does not count duplicate writes, a failed write, or a blocked foundation wri
   expect(result.content).toMatchObject({ "app.ts": "second", "styles.css": "successful stylesheet", "system.ts": "immutable foundation" });
 }, 20_000);
 
-it("leaves a repair running after every owned file was written so it can make later corrections", async () => {
+it("returns a substantive repair batch to verification after all files and same-batch corrections drain", async () => {
   const files = ["app.ts", "domain.ts", "styles.css"];
   const result = await runFixture({
     files, repair: true,
-    response: (request) => request === 1 ? files.map((file) => ({ path: file, content: "repair first pass" }))
-      : request === 2 ? [{ path: "app.ts", content: "repair later correction" }] : "stop",
+    response: () => [
+      ...files.map((file) => ({ path: file, content: "repair first pass" })),
+      { name: "edit", arguments: { path: "app.ts", oldText: "repair first pass", newText: "same-batch correction" } },
+    ],
+  });
+  expect(result.requests).toBe(1);
+  expect(result.content).toMatchObject({ "app.ts": "same-batch correction", "domain.ts": "repair first pass", "styles.css": "repair first pass" });
+  expect(result.events.filter((event) => event.type === "tool_execution_end")).toHaveLength(4);
+  expect(result.events.some((event) => event.toolName === "finish_repair")).toBe(false);
+}, 20_000);
+
+it("does not hand back for noop writes, refused writes, failed edits, or reads without a substantive mutation", async () => {
+  const result = await runFixture({
+    files: ["app.ts"], repair: true, read: true,
+    prepare: (app) => writeFile(path.join(app, "app.ts"), "original"),
+    response: (request) => request === 1 ? [
+      { path: "app.ts", content: "original" },
+    ] : request === 2 ? [
+      { path: "system.ts", content: "must stay blocked" },
+      { name: "edit", arguments: { path: "app.ts", oldText: "missing", newText: "replacement" } },
+      { name: "read", arguments: { path: "app.ts" } },
+    ] : [{ name: "edit", arguments: { path: "app.ts", oldText: "original", newText: "actual correction" } }],
   });
   expect(result.requests).toBe(3);
-  expect(result.content["app.ts"]).toBe("repair later correction");
+  expect(result.content).toMatchObject({ "app.ts": "actual correction", "system.ts": "immutable foundation" });
+  expect(result.events.filter((event) => event.type === "tool_execution_end" && event.isError)).toHaveLength(2);
+  expect(JSON.stringify(result.requestBodies[2]!.messages)).toContain("missing");
+}, 20_000);
+
+it("preserves a mixed successful and failed repair batch, then accepts explicit handback", async () => {
+  const result = await runFixture({
+    files: ["app.ts", "styles.css"], repair: true,
+    response: (request) => request === 1 ? [
+      { path: "app.ts", content: "actual correction" },
+      { name: "edit", arguments: { path: "app.ts", oldText: "missing", newText: "must fail" } },
+      { path: "styles.css", content: "completed despite earlier failure" },
+    ] : [{ name: "finish_repair", arguments: { summary: "Return mixed batch to verification with the failed edit preserved." } }],
+  });
+  // Pi requires every native result to request termination. A native failure
+  // cannot carry our getter, so retain this honest fallback rather than marking
+  // the failed edit successful merely to stop one response earlier.
+  expect(result.requests).toBe(2);
+  expect(result.content).toMatchObject({ "app.ts": "actual correction", "styles.css": "completed despite earlier failure" });
+  expect(result.events.filter((event) => event.type === "tool_execution_end")).toHaveLength(4);
+  expect(result.events.filter((event) => event.type === "tool_execution_end" && event.isError)).toHaveLength(1);
+  expect(JSON.stringify(result.requestBodies[1]!.messages)).toContain("missing");
 }, 20_000);
 
 it("drains writes and edits around a mixed repair handoff without a second HTTP request", async () => {

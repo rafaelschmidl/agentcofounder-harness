@@ -1,18 +1,30 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { createEditToolDefinition, createWriteToolDefinition, defineTool, type ExtensionAPI, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
 
 export default function repairCompletion(pi: ExtensionAPI) {
   let handedOff = false;
+  // Observation must not change native file-tool success or failure semantics.
+  const contents = (file: string) => readFile(file).catch(() => null);
   function withHandoff<TParameters extends TSchema, TDetails>(tool: ToolDefinition<TParameters, TDetails>) {
     return {
       ...tool,
       async execute(...args: Parameters<typeof tool.execute>) {
+        const file = path.resolve(process.cwd(), String((args[1] as { path: string }).path));
+        const before = await contents(file);
         // Preserve native failures. An unsuccessful edit must remain an error,
         // even when another call in its batch requests a verification handoff.
         const result = await tool.execute(...args);
+        const after = await contents(file);
+        if (after !== null && (before === null || !after.equals(before))) handedOff = true;
         return {
           ...result,
-          // Pi reads every result's flag after the complete batch drains.
+          // Return after the first real mutation batch, without requiring another
+          // model response to request verification. Pi reads these getters only
+          // after all calls drain, including later corrections in the same batch.
+          // Native errors have no flag, so mixed-error batches may need the
+          // existing explicit finish_repair fallback; do not fake their success.
           get terminate() { return handedOff; },
         };
       },
