@@ -65,6 +65,7 @@ async function readTestFailures(file: string): Promise<string> {
       testResults?: Array<{
         assertionResults?: Array<{
           title?: unknown;
+          fullName?: unknown;
           status?: unknown;
           failureMessages?: unknown;
         }>;
@@ -74,13 +75,29 @@ async function readTestFailures(file: string): Promise<string> {
       .flatMap((suite) => suite.assertionResults ?? [])
       .filter((assertion) => assertion.status === "failed")
       .map((assertion) => {
-        const title = typeof assertion.title === "string" ? assertion.title : "unnamed test";
+        const title = typeof assertion.fullName === "string" ? assertion.fullName
+          : typeof assertion.title === "string" ? assertion.title : "unnamed test";
         const messages = Array.isArray(assertion.failureMessages)
           ? assertion.failureMessages.filter((message): message is string => typeof message === "string")
           : [];
-        return `### ${title}\n\n${messages.join("\n").slice(0, 3_000)}`;
+        const message = messages.join("\n").replace(ANSI_ESCAPE, "");
+        // Group identical diagnostics, not their expected/received values or
+        // selectors. Repeated DOM dumps often hide the actual source locations.
+        const diagnostic = message.split(/\n(?:Here are the matching elements:|Ignored nodes:|\s+at )/u)[0]!.trim();
+        const locations = message.split(/\r?\n/u).filter((line) => /(?:\bat |❯).*src\/product\//u.test(line));
+        return { title, diagnostic: diagnostic || message, excerpt: message.slice(0, 3_000), locations };
       });
-    return failures.length > 0 ? failures.join("\n\n") : "(no failed assertions in JSON report)";
+    const groups = new Map<string, typeof failures>();
+    for (const failure of failures) {
+      const group = groups.get(failure.diagnostic) ?? [];
+      group.push(failure);
+      groups.set(failure.diagnostic, group);
+    }
+    return failures.length > 0 ? [...groups.values()].map((group) => {
+      const locations = [...new Set(group.flatMap((failure) => failure.locations))];
+      return `### Failed tests (${group.length})\n\n${group.map((failure) => `- ${failure.title}`).join("\n")}\n\n${group[0]!.excerpt}`
+        + (locations.length > 0 ? `\n\nSource locations:\n${locations.join("\n")}` : "");
+    }).join("\n\n") : "(no failed assertions in JSON report)";
   } catch {
     return "(test result JSON unavailable)";
   }
@@ -136,7 +153,7 @@ export async function collectRepairDiagnosis(
   const relevantEvidence = stage === "build"
     ? `## Production build failures\n\n${buildLog}`
     : stage === "tests"
-      ? `## Failed test assertions\n\n${testFailures}\n\n## Product test log\n\n${testLog}`
+      ? `## Failed test assertions\n\n${testFailures}\n\n## Product test log\n\n${compactTestLog(testLog, testFailures)}`
       : stage === "startup"
         ? `## Development startup failures\n\n${startupLog}`
         : rawLogs.map(({ label, content }) => `## ${label}\n\n${content}`).join("\n\n");
@@ -161,4 +178,14 @@ export async function collectRepairDiagnosis(
     stage,
     permittedPaths,
   };
+}
+
+function compactTestLog(log: string, failures: string): string {
+  const clean = log.replace(ANSI_ESCAPE, "");
+  // Keep unstructured/suite/runtime failures: they may not have an assertion in
+  // the JSON report. Full logs and reports remain retained in every run.
+  if (failures.startsWith("(") || /Unhandled|Failed Suites|Error during|unhandled/iu.test(clean)) return clean;
+  if (clean.length <= 1_500) return clean;
+  const locations = [...new Set(clean.split(/\r?\n/u).filter((line) => /(?:\bat |❯).*src\/product\//u.test(line)))];
+  return ["Repeated assertion/DOM output omitted; the grouped JSON diagnostics above retain every failed test. Full app-test.log remains in the verification artifacts.", ...locations].join("\n");
 }
