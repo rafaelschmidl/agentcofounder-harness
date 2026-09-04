@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
+import { withProviderAllowanceLock } from "./provider-allowance-lock.js";
 
 type RequestEntry = {
   id: string; stage_evidence: string; at: string; status: "reserved" | "unknown" | "measured";
@@ -33,28 +33,19 @@ function validate(value: ProviderAllowance): void {
 
 async function mutate(path: string, update: (ledger: ProviderAllowance) => void): Promise<void> {
   const target = resolve(path);
-  const lock = `${target}.lock`;
-  const deadline = Date.now() + 5_000;
-  while (true) {
-    try { await mkdir(lock); break; }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      if (Date.now() >= deadline) throw new Error("Development allowance lock unavailable; provider HTTP refused");
-      await delay(20);
+  await withProviderAllowanceLock(target, async () => {
+    const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
+    try {
+      const ledger = JSON.parse(await readFile(target, "utf8")) as ProviderAllowance;
+      validate(ledger);
+      update(ledger);
+      validate(ledger);
+      await writeFile(temporary, `${JSON.stringify(ledger, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+      await rename(temporary, target);
+    } finally {
+      await rm(temporary, { force: true });
     }
-  }
-  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
-  try {
-    const ledger = JSON.parse(await readFile(target, "utf8")) as ProviderAllowance;
-    validate(ledger);
-    update(ledger);
-    validate(ledger);
-    await writeFile(temporary, `${JSON.stringify(ledger, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
-    await rename(temporary, target);
-  } finally {
-    await rm(temporary, { force: true });
-    await rm(lock, { recursive: true, force: true });
-  }
+  });
 }
 
 export async function reserveProviderRequest(path: string, request: { id: string; stageEvidence: string; modelId: string; contextWindow: number; outputTokenCap: number }): Promise<void> {
