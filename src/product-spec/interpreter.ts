@@ -7,10 +7,20 @@ import { createPiEnvironment } from "../pi-environment.js";
 import { hashIdea, segmentIdea } from "./fragments.js";
 import type { ProductSpec, SourceFragment } from "./types.js";
 import { validateProductSpec } from "./validate.js";
+import { executableCollectionEnabled } from "../executable-collection/types.js";
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "../..");
 export const DEFAULT_INTERPRETER_THINKING = "off";
+const EXECUTABLE_COLLECTION_INSTRUCTION = `
+
+## Opt-in executable collection experiment
+Keep the complete canonical ProductSpec and provenance. Also submit collection_execution.
+For one flat local string/enum collection whose complete domain rules fit the supplied contract schema, choose mode compiled. Otherwise choose mode custom with the concrete unsupported reason; never omit a requirement to fit the compiler.
+The contract compiles domain.ts before UI generation. Map every editable/hidden key exactly to its canonical entity field ID; use required and enum choices consistently. Set hidden defaults for state which ordinary editing must preserve. Identifier IDs are supplied by the controller. Do not add dates, redundant states, closed enums from examples, or extra fields merely to suit the contract. Domain requirement_ids reference IMPLEMENT requirements; presentation requirements stay in the UI.
+Actions have explicit input fields, validation, additional when guards, literal/input assignments, and success messages. The compiler supports conjunctions of equals/empty/present tests and conditional invariants (when implies must). State invariants apply to stored records and every successful mutation. For the one supported workflow, provide state_binding mapping each canonical workflow state to a predicate on hidden fields, and map each action to its canonical transition_id. The compiler adds the canonical source/target guards itself, so every declared transition must appear exactly once. Keep entity/workflow semantics and the executable contract consistent.
+Choose custom for relations, transactions, external/async effects, numeric/date validation, cross-record constraints, unsupported formulas or invariants, multiple workflows or collections. The existing custom builder remains available. The free product UI and actual journey tests are generated separately in both modes.
+`;
 
 export function interpreterThinkingFromEnvironment(): string {
   return process.env.CHALLENGE_INTERPRETER_THINKING
@@ -53,7 +63,7 @@ export function buildInterpreterPiArguments(
     "--tools",
     "retrieve_patterns,submit_product_spec",
     "--system-prompt",
-    systemPrompt.trim(),
+    systemPrompt.trim() + (executableCollectionEnabled() ? EXECUTABLE_COLLECTION_INSTRUCTION : ""),
     "--session-dir",
     path.join(artifactDirectory, "sessions"),
     "--extension",
@@ -99,6 +109,7 @@ export async function runProductSpecInterpretation(
   ]);
 
   const environment = await createPiEnvironment(artifactDirectory, {
+    CHALLENGE_EXECUTABLE_COLLECTION: executableCollectionEnabled() ? "1" : undefined,
     SYSTEM_V0_IDEA_FILE: files.idea,
     SYSTEM_V0_FRAGMENTS_FILE: files.fragments,
     SYSTEM_V0_PRODUCT_SPEC_FILE: files.productSpec,

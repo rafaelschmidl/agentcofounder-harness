@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { COLLECTION_EXECUTION_SCHEMA } from "../../src/executable-collection/schema.js";
+import { executableCollectionEnabled } from "../../src/executable-collection/types.js";
 import { appendPatternRetrievalAudit } from "../../src/patterns/audit.js";
 import { retrievePatterns } from "../../src/patterns/catalog.js";
 import { replaceDraftValues, submitProductSpecDraftCandidate } from "../../src/product-spec/submit.js";
@@ -43,6 +45,10 @@ export function productSpecDraftSchema(): Record<string, unknown> {
   delete schema.$schema;
   delete schema.$id;
   schema.title = "Compact ProductSpec semantic draft";
+  if (executableCollectionEnabled()) {
+    schema.properties.collection_execution = COLLECTION_EXECUTION_SCHEMA;
+    schema.required.push("collection_execution");
+  }
   return schema;
 }
 
@@ -88,6 +94,15 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
       promptGuidelines: [
         "Submit draft initially. If rejected, use replacements to fix erroneous values in the retained draft. Supply either draft or replacements, never both.",
       ],
+      executionMode: "sequential",
+      prepareArguments(args) {
+        // Retain before SDK validation, while preserving the original strict arguments.
+        if (typeof args === "object" && args !== null && !Array.isArray(args)
+          && Object.hasOwn(args, "draft") && !Object.hasOwn(args, "replacements")) {
+          retainedDraft = structuredClone((args as { draft: unknown }).draft);
+        }
+        return args as { draft?: unknown; replacements?: { path: string; value: unknown }[] };
+      },
       parameters: Type.Object({
         draft: Type.Optional(Type.Unsafe<unknown>(draftSchema)),
         replacements: Type.Optional(Type.Array(Type.Object({

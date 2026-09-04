@@ -4,6 +4,7 @@ import { capabilityBlock } from "./blocks.js";
 import { contentHash } from "./hash.js";
 import type { BuildPlan } from "./types.js";
 import type { ProductSpec } from "../product-spec/types.js";
+import { executableContract } from "../executable-collection/validate.js";
 
 const schema = JSON.parse(
   readFileSync(new URL("./build-plan.schema.json", import.meta.url), "utf8"),
@@ -59,6 +60,11 @@ function semanticErrors(plan: BuildPlan, spec: ProductSpec): string[] {
   }
 
   for (const planned of plan.blocks) {
+    if (planned.id === "domain.executable-collection") {
+      try {
+        if (contentHash(planned.config.contract) !== contentHash(executableContract(spec))) errors.push("compiled collection contract differs from the validated ProductSpec");
+      } catch (error) { errors.push(String(error)); }
+    }
     const block = capabilityBlock(planned.id);
     if (!block) {
       errors.push(`unknown block ${planned.id}`);

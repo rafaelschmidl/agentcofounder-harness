@@ -2,6 +2,7 @@ import { capabilityBlock } from "./blocks.js";
 import { contentHash } from "./hash.js";
 import type { BuildPlan, PlannedBlock, RequirementImplementation } from "./types.js";
 import type { ProductSpec, Requirement } from "../product-spec/types.js";
+import { executableContract } from "../executable-collection/validate.js";
 
 const BLOCK_ORDER = [
   "app.foundation",
@@ -12,6 +13,7 @@ const BLOCK_ORDER = [
   "integration.payment-stub",
   "ui.accessible-shell",
   "ui.collection-controller",
+  "domain.executable-collection",
   "verification.product",
 ] as const;
 
@@ -35,7 +37,7 @@ const LINKER_FILES = [
   "src/styles.css",
 ];
 
-function selectedBlockIds(spec: ProductSpec): Set<string> {
+function selectedBlockIds(spec: ProductSpec, executableCollection = false): Set<string> {
   const selected = new Set<string>(["app.foundation", "ui.accessible-shell", "verification.product"]);
   if (spec.persistence.mode === "LOCAL") selected.add("data.local-repository");
   if (spec.entities.length > 0 || spec.selected_patterns.includes("crud.collection@1.0.0")) {
@@ -62,6 +64,7 @@ function selectedBlockIds(spec: ProductSpec): Set<string> {
     !selected.has("domain.transaction") && !selected.has("integration.payment-stub")) {
     selected.add("ui.collection-controller");
   }
+  if (executableCollection && spec.collection_execution?.mode === "compiled") selected.add("domain.executable-collection");
 
   const addDependencies = (blockId: string, visiting = new Set<string>()): void => {
     if (visiting.has(blockId)) throw new Error(`Capability dependency cycle at ${blockId}`);
@@ -80,6 +83,8 @@ function selectedBlockIds(spec: ProductSpec): Set<string> {
 
 function blockConfig(blockId: string, spec: ProductSpec): Record<string, unknown> {
   switch (blockId) {
+    case "domain.executable-collection":
+      return { contract: executableContract(spec) };
     case "app.foundation":
       return { product_name: spec.product.experience?.name ?? spec.product.summary, product_summary: spec.product.summary };
     case "data.local-repository":
@@ -131,14 +136,17 @@ function plannedBlocks(spec: ProductSpec, selected: Set<string>): PlannedBlock[]
   });
 }
 
-export function compileProductSpec(spec: ProductSpec): BuildPlan {
-  const selected = selectedBlockIds(spec);
+export function compileProductSpec(spec: ProductSpec, options: { executableCollection?: boolean } = {}): BuildPlan {
+  const selected = selectedBlockIds(spec, options.executableCollection);
+  const agentFiles = selected.has("domain.executable-collection") ? AGENT_FILES.filter((file) => file !== "src/product/domain.ts") : AGENT_FILES;
   const blocks = plannedBlocks(spec, selected);
   const implementedRequirements = spec.requirements.filter((requirement) => requirement.disposition === "IMPLEMENT");
   const customSlotId = "custom_product";
   const requirementMapping: RequirementImplementation[] = implementedRequirements.map((requirement) => ({
     requirement_id: requirement.id,
-    block_ids: requirementBlocks(requirement, selected),
+    block_ids: [...requirementBlocks(requirement, selected), ...(selected.has("domain.executable-collection")
+      && spec.collection_execution?.mode === "compiled" && spec.collection_execution.requirement_ids.includes(requirement.id)
+      ? ["domain.executable-collection"] : [])],
     custom_slot_ids: [customSlotId],
   }));
 
@@ -148,7 +156,7 @@ export function compileProductSpec(spec: ProductSpec): BuildPlan {
       if (!block) throw new Error(`Unknown selected block ${planned.id}`);
       return block.owned_files.map((file) => ({ path: file, owner: "BLOCK" as const, owner_id: planned.id }));
     }),
-    ...AGENT_FILES.map((file) => ({ path: file, owner: "AGENT" as const, owner_id: customSlotId })),
+    ...agentFiles.map((file) => ({ path: file, owner: "AGENT" as const, owner_id: customSlotId })),
     ...LINKER_FILES.map((file) => ({ path: file, owner: "LINKER" as const, owner_id: "deterministic_linker" })),
   ].sort((left, right) => left.path.localeCompare(right.path));
 
@@ -159,10 +167,14 @@ export function compileProductSpec(spec: ProductSpec): BuildPlan {
     custom_slots: [
       {
         id: customSlotId,
-        purpose: "Implement product-specific domain composition, interface language, visual design, and journey tests.",
+        purpose: selected.has("domain.executable-collection")
+          ? "Implement product-specific interface composition, visual identity, and independent journey tests using the compiled domain."
+          : "Implement product-specific domain composition, interface language, visual design, and journey tests.",
         requirement_ids: implementedRequirements.map((requirement) => requirement.id),
-        required_interfaces: blocks.flatMap((planned) => capabilityBlock(planned.id)?.exported_interfaces ?? []),
-        permitted_paths: [...AGENT_FILES],
+        required_interfaces: selected.has("domain.executable-collection")
+          ? ["definition", "useProductCollection"]
+          : blocks.flatMap((planned) => capabilityBlock(planned.id)?.exported_interfaces ?? []),
+        permitted_paths: [...agentFiles],
       },
     ],
     file_ownership: fileOwnership,

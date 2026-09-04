@@ -1,4 +1,5 @@
 import type { CapabilityBlock, MaterializedFile } from "./types.js";
+import { EXECUTABLE_COLLECTION_BLOCK } from "../executable-collection/block.js";
 import { RECORD_FORM_SOURCE } from "./record-form.js";
 import { COLLECTION_CONTROLLER_SOURCE } from "./collection-controller.js";
 
@@ -476,5 +477,6 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
 ];
 
 export function capabilityBlock(blockId: string): CapabilityBlock | undefined {
+  if (blockId === EXECUTABLE_COLLECTION_BLOCK.id) return EXECUTABLE_COLLECTION_BLOCK;
   return CAPABILITY_BLOCKS.find((block) => block.id === blockId);
 }

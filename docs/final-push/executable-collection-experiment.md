@@ -1,0 +1,20 @@
+# Executable collection experiment
+
+Set `CHALLENGE_EXECUTABLE_COLLECTION=1` to ask interpretation for either a closed `collection_execution` contract or an explicit `mode: custom` reason. The switch defaults off. It does not bypass the original requirements, provenance, journeys, or ProductSpec validation.
+
+For a supported contract the compiler owns `src/product/domain.ts` and the pure contract runtime. The model generates three files: its own `App.tsx`, product CSS, and independent journey tests. Page composition, identity, density, colors and typography remain product decisions; no compiled page layout is introduced. The supplied controller owns persistence, draft validation, guarded actions, record editing, hidden state preservation and failure recovery. Ownership enforcement prevents repair from rewriting that domain; the prompts also prohibit replacing its semantics in App, which still needs output assessment.
+
+The supported domain is one flat local collection of string/enum fields, optionally one state machine. Guard predicates are conjunctions of equality, empty and present tests. Actions assign literal values or validated input values. Conditional record invariants are evaluated on storage and mutations. Workflow predicates use hidden fields, defaults must select the canonical initial state, and the compiler derives action source/target guards from canonical transitions. Contract fields and enum choices must agree with entity fields. State-machine actions must cover each declared transition exactly once.
+
+Choose custom for numeric/date rules, multiple collections/workflows, relationships, cross-record constraints, transactions, external/async effects, unsupported formulas or invariants. The four-file custom builder remains available. An `identifier` field is supported only when it is the controller-owned `id`; other identity semantics require custom generation.
+
+Validation performed on native Node 22.19.0:
+
+- Harness typecheck passed.
+- All 157 harness tests passed, including 9 contract/ownership tests and a nested materialized React suite. The nested suite performs Book create/lend/edit/return/delete/remount, nondefault fields, failed-storage draft preservation/retry, and SaaS forward-only transitions with reload. It also typechecks the actual generated domain and helper files.
+- Deliberate wrong initial states, unbound actions, unsupported identifiers, duplicate enum choices, broad action guards, wrong target assignments and complete-record invariant violations are rejected.
+- The ordinary/default and explicit custom paths retain four AGENT-owned files. Compiler-owned domain tampering is rejected; repair scopes exclude that file and preserve journey assertion intent.
+
+The first full suite attempt was sandboxed and failed only local-listener tests with EPERM. The native rerun passed all 157 tests. The worktree incorporates the raw-draft retention behavior of `bdcb021` and output-limit configuration of `933b852`.
+
+This is offline implementation evidence, not a model-generation quality or token-saving result. The Book and SaaS contracts are hand-authored development fixtures; the runtime does not route by fixture names. The interpreter still makes semantic judgments when mapping prose to fields, states and invariant predicates. Structural agreement cannot prove that those judgments preserve the raw idea, so generated independent journeys and external evaluation remain necessary. Compiler-domain mistakes are retained as failures; automatic contract reinterpretation after a failed product run is not implemented in this experiment.

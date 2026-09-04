@@ -1,3 +1,5 @@
+import type { CollectionExecution } from "../executable-collection/types.js";
+
 export const PRODUCT_SPEC_VERSION = "0.1" as const;
 
 export type RequirementProvenance =
@@ -110,6 +112,7 @@ export interface AcceptanceJourney {
 }
 
 export interface ProductSpec {
+  collection_execution?: CollectionExecution;
   version: typeof PRODUCT_SPEC_VERSION;
   source_idea_hash: string;
   source_fragments: SourceFragment[];
