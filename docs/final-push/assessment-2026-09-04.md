@@ -121,3 +121,10 @@ The strongest defensible story is: the model interprets the idea and makes produ
 First fix the proven delivery defect and calibrate the handful of consequential acceptance checks. Start the public-release package early. Give generated UX and unfamiliar Book-scale behavior the largest discretionary share. Run compact-contract and patch-repair candidates as low-risk efficiency experiments, and consider one strictly bounded configuration-renderer spike for higher upside. Select improvements from evidence, retain a working candidate, and reserve uninterrupted final validation/submission time.
 
 Do not optimize against an invented 15-minute official limit or a claimed settled token-only ranking. Do not assume unlimited runtime either. The plan should name uncertainty explicitly and choose improvements that remain valuable across the plausible judging interpretations.
+
+
+## Organizer clarification observed at 15:34 UTC, September 4
+
+Ravi Singh posted at15:24 Stockholm that the final submission should include the exact pushed commit SHA in the form’s Short Notes / Highlights field. The submitted repository URL alone does not identify the deadline revision; organizers will judge the supplied SHA. The commit must be pushed and public at submission, must remain resolvable, and an already-submitted team can submit again with the SHA, with the later entry used. Source: https://sthlmai.slack.com/archives/C0BR06UDB1A/p1788528245058219?thread_ts=1788513822.232009&cid=C0BR06UDB1A .
+
+This updates the eventual submission handoff only. It does not authorize publication or submission during the accepted development goal, and it does not add a runtime or development deadline. Existing source snapshots and exact revision evidence already support this requirement.
