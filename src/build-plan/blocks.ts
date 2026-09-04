@@ -205,6 +205,45 @@ export function transactOnce<State, Value>(
     value: result.value,
   };
 }
+
+export interface TransactionRepository<State> {
+  load(): TransactionEnvelope<State>;
+  save(envelope: TransactionEnvelope<State>): void;
+}
+
+// transact/transactOnce prepare candidates only. This store owns the durable commit boundary.
+// The repository must save its complete envelope synchronously in one atomic write.
+export class TransactionStore<State> {
+  private current: TransactionEnvelope<State>;
+  private committing = false;
+
+  constructor(private readonly repository: TransactionRepository<State>) {
+    this.current = repository.load();
+  }
+
+  get state(): State { return this.current.state; }
+
+  commit<Value>(
+    idempotencyKey: string,
+    prepare: (snapshot: State) => { next: State; value: Value } | { error: string },
+  ): IdempotentTransactionResult<State, Value> {
+    if (this.committing) return { ok: false, envelope: this.current, error: "A change is already being processed." };
+    this.committing = true;
+    try {
+      // Validate all mutable preconditions against this latest snapshot inside prepare.
+      const prepared = transactOnce<State, Value>(this.current, idempotencyKey, prepare);
+      if (!prepared.ok) return prepared;
+      try { this.repository.save(prepared.envelope); }
+      catch { return { ok: false, envelope: this.current, error: "Could not save your changes. Your saved data is unchanged; try again." }; }
+      this.current = prepared.envelope;
+      return prepared;
+    } catch {
+      return { ok: false, envelope: this.current, error: "Could not prepare this change. Your saved data is unchanged." };
+    } finally {
+      this.committing = false;
+    }
+  }
+}
 `,
     },
   ];
@@ -229,16 +268,22 @@ export interface PaymentProvider {
   charge(input: PaymentInput): Promise<PaymentResult>;
 }
 
+// Pure synchronous simulation can run inside TransactionStore.commit's preparation.
+// This simulates an outcome; it does not save an order or perform a real charge.
+export function simulatePayment(input: PaymentInput): PaymentResult {
+  const key = input.idempotencyKey.trim();
+  if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 || !key) {
+    return { ok: false, code: "invalid", message: "A positive amount and idempotency key are required." };
+  }
+  if (input.mode === "decline") {
+    return { ok: false, code: "declined", message: "The simulated payment was declined." };
+  }
+  return { ok: true, reference: \`stub-\${key}\` };
+}
+
 export class DeterministicPaymentStub implements PaymentProvider {
   async charge(input: PaymentInput): Promise<PaymentResult> {
-    const key = input.idempotencyKey.trim();
-    if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 || !key) {
-      return { ok: false, code: "invalid", message: "A positive amount and idempotency key are required." };
-    }
-    if (input.mode === "decline") {
-      return { ok: false, code: "declined", message: "The simulated payment was declined." };
-    }
-    return { ok: true, reference: \`stub-\${key}\` };
+    return simulatePayment(input);
   }
 }
 `,
@@ -411,9 +456,9 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
   },
   {
     id: "domain.transaction",
-    version: "1.0.0",
+    version: "1.1.0",
     config_schema: objectSchema({ mode: { const: "atomic-local" } }, ["mode"]),
-    capabilities: ["atomic-effects", "failure-rollback", "idempotent-submit"],
+    capabilities: ["atomic-effects", "failure-rollback", "idempotent-submit", "persist-before-success", "canonical-transaction-state"],
     dependencies: ["app.foundation"],
     conflicts: [],
     owned_files: ["src/system/transaction.ts"],
@@ -423,19 +468,21 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
       "IdempotentTransactionResult",
       "transact",
       "transactOnce",
+      "TransactionRepository",
+      "TransactionStore",
     ],
     materialize: transactionFiles,
-    checks: ["success commits once", "failure preserves state", "duplicate idempotency key is rejected"],
+    checks: ["success commits once", "failure preserves state", "duplicate idempotency key is rejected", "save failure preserves state and permits retry"],
   },
   {
     id: "integration.payment-stub",
-    version: "1.0.0",
+    version: "1.1.0",
     config_schema: objectSchema({ modes: { type: "array", items: { enum: ["succeed", "decline"] } } }, ["modes"]),
     capabilities: ["payment-provider-interface", "deterministic-success", "deterministic-decline", "no-network-payment"],
     dependencies: ["domain.transaction"],
     conflicts: ["integration.real-payment"],
     owned_files: ["src/system/payment.ts"],
-    exported_interfaces: ["PaymentProvider", "PaymentInput", "PaymentMode", "PaymentResult", "DeterministicPaymentStub"],
+    exported_interfaces: ["PaymentProvider", "PaymentInput", "PaymentMode", "PaymentResult", "DeterministicPaymentStub", "simulatePayment"],
     materialize: paymentFiles,
     checks: ["stub success test", "stub decline test", "no payment network test"],
   },
