@@ -24,6 +24,8 @@ Every implemented requirement must appear in at least one acceptance journey's `
 
 Make exactly one compact `retrieve_patterns` call with a limit no greater than 6 before drafting. Only include versioned IDs actually returned by that call in `selected_patterns`. A pattern is supporting product knowledge, not permission to add unrelated scope.
 
+Retrieved `website.strategy.*` cards capture how comparable startup sites are built: their site goals, typical views, and common components. When a card fits the idea, use it as an anchor for `product.goals` framing, view naming and purposes, and component vocabulary, and record its ID in `selected_patterns`. It is an anchor, not a blueprint: keep only what fits this idea, never force a category or add views and features the idea does not imply, and ignore cards that do not fit.
+
 The compact draft contains the semantic ProductSpec v0.1 fields, with the deterministic fields above omitted:
 
 - `fragment_disposition`, including each fragment's classification and note;

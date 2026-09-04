@@ -1,0 +1,25 @@
+{
+  "id": "website.strategy.community-content@1.0.0",
+  "title": "Community and content platform website",
+  "summary": "A site where members publish, browse, and engage with content: a public feed, a readable content detail view, member identity, and a creator path alongside the reader path.",
+  "signals": ["community", "blog", "newsletter", "articles", "posts", "forum", "podcast", "creator", "readers", "members", "discussions", "publish"],
+  "capabilities": ["public-feed", "content-detail", "member-signup", "engagement-actions", "creator-publishing", "member-profiles"],
+  "defaults": ["Keep a public browsable feed visible before signup", "Make engaging (comment, react, subscribe) the sign-in payoff", "Treat reading and creating as two distinct member paths"],
+  "risks": ["Content invisible pre-signup with no public feed", "No author or member identity on content", "Comment and reaction affordances missing from the content view"],
+  "verification": ["Browse a public feed without signing up", "Open a content detail view and see author identity", "Sign up, engage with content, and publish from the creator path"],
+  "site_goals": ["Acquire members and creators through join or subscribe", "Keep people engaging with feeds, comments, and reactions", "Grow content supply through the creator publishing path"],
+  "typical_views": [
+    {"name": "Public feed", "purpose": "Browse fresh content from the community before and after signup"},
+    {"name": "Content detail", "purpose": "Read or watch one item fully with author identity and engagement actions"},
+    {"name": "Member signup", "purpose": "Join the community and unlock posting, commenting, and subscribing"},
+    {"name": "Member profile", "purpose": "Show a member's identity, contributions, and activity"},
+    {"name": "Creator publishing flow", "purpose": "Let creators draft, publish, and manage their content"},
+    {"name": "Comments and discussion", "purpose": "Host conversations attached to each content item"}
+  ],
+  "common_components": ["content feed list", "content card with author", "article or post detail", "comment thread", "like or upvote control", "subscribe or join button", "member avatar and profile link", "tag or topic chips"],
+  "example_startups": [
+    {"name": "Reddit", "note": "Feed-first browsing with voting as the engagement signal"},
+    {"name": "Substack", "note": "Creator publication pages with subscribe available everywhere"},
+    {"name": "Medium", "note": "Reading experience as the product with claps and author profiles"}
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "website.strategy.commerce@1.0.0",
+  "title": "Commerce storefront website",
+  "summary": "A store whose website converts browsing into buying: catalogue browsing, product decisions in a detail page, cart management, and a trustworthy checkout.",
+  "signals": ["shop", "storefront", "store", "boutique", "webshop", "retail", "merch", "merchandise", "goods", "products for sale"],
+  "capabilities": ["product-catalogue", "product-detail", "cart", "checkout-flow", "order-confirmation", "shipping-information", "sale-promotions"],
+  "defaults": ["Lead every view with the primary buy action", "Attach price and stock next to the add-to-cart control", "Show the cart as a dedicated view, not only a counter", "End checkout in a clear order confirmation"],
+  "risks": ["Flat catalogue with no product detail view", "Cart reduced to a counter with no editable view", "Checkout without totals or confirmation"],
+  "verification": ["Browse catalogue and open a product detail view", "Add to cart, edit quantities, and view the cart", "Complete checkout and see an order confirmation"],
+  "site_goals": ["Sell product by converting browsing into checkout", "Reduce purchase friction with clear price, stock, and shipping information", "Build first-time buyer trust with product visuals and reviews"],
+  "typical_views": [
+    {"name": "Storefront home", "purpose": "Present the shop and its products with a direct first buy path"},
+    {"name": "Product catalogue", "purpose": "Browse products with search, category navigation, and filters"},
+    {"name": "Product detail", "purpose": "Support the purchase decision with price, images, stock, and reviews"},
+    {"name": "Cart", "purpose": "Review and edit chosen items and quantities before checkout"},
+    {"name": "Checkout", "purpose": "Collect order details and complete the purchase deterministically"},
+    {"name": "Order confirmation", "purpose": "Confirm the completed order and show its summary"}
+  ],
+  "common_components": ["hero with primary CTA", "category navigation", "product grid", "filter sidebar", "product gallery", "price and stock display", "add-to-cart button", "cart line editor", "order totals panel", "order confirmation summary"],
+  "example_startups": [
+    {"name": "Allbirds", "note": "Minimalist storefront: one hero, one dominant buy path"},
+    {"name": "Glossier", "note": "Product storytelling plus a strong shop-all route"},
+    {"name": "Etsy shops", "note": "Filter-rich catalogue with inline social proof"}
+  ]
+}

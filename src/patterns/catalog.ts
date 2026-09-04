@@ -2,6 +2,24 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+export interface WebsiteStrategyView {
+  name: string;
+  purpose: string;
+}
+
+export interface ExampleStartup {
+  name: string;
+  note: string;
+}
+
+const WEBSITE_STRATEGY_PREFIX = "website.strategy.";
+
+function nonEmptyStrings(value: unknown, file: string, field: string): void {
+  if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== "string" || !item.trim())) {
+    throw new Error(`Invalid ${field} in ${file}`);
+  }
+}
+
 export interface PatternCard {
   id: string;
   title: string;
@@ -11,6 +29,10 @@ export interface PatternCard {
   defaults: string[];
   risks: string[];
   verification: string[];
+  site_goals?: string[];
+  typical_views?: WebsiteStrategyView[];
+  common_components?: string[];
+  example_startups?: ExampleStartup[];
 }
 
 interface PatternIndex {
@@ -42,6 +64,41 @@ function assertCard(card: PatternCard, file: string): void {
   if (!card.title || !card.summary || arrays.some((items) => !Array.isArray(items) || items.length === 0)) {
     throw new Error(`Incomplete pattern card: ${file}`);
   }
+  if (card.site_goals !== undefined) nonEmptyStrings(card.site_goals, file, "site_goals");
+  if (card.common_components !== undefined) nonEmptyStrings(card.common_components, file, "common_components");
+  if (card.typical_views !== undefined) {
+    if (
+      !Array.isArray(card.typical_views) ||
+      card.typical_views.length === 0 ||
+      card.typical_views.some(
+        (view) => typeof view?.name !== "string" || !view.name.trim() || typeof view?.purpose !== "string" || !view.purpose.trim(),
+      )
+    ) {
+      throw new Error(`Invalid typical_views in ${file}`);
+    }
+  }
+  if (card.example_startups !== undefined) {
+    if (
+      !Array.isArray(card.example_startups) ||
+      card.example_startups.some((startup) => typeof startup?.name !== "string" || !startup.name.trim() || typeof startup?.note !== "string" || !startup.note.trim())
+    ) {
+      throw new Error(`Invalid example_startups in ${file}`);
+    }
+  }
+  if (card.id.startsWith(WEBSITE_STRATEGY_PREFIX)) {
+    const required: Array<[unknown, string]> = [
+      [card.site_goals, "site_goals"],
+      [card.typical_views, "typical_views"],
+      [card.common_components, "common_components"],
+      [card.example_startups, "example_startups"],
+    ];
+    if (required.some(([value]) => value === undefined)) {
+      throw new Error(`Website strategy card missing website knowledge fields: ${file}`);
+    }
+    if (card.example_startups !== undefined && card.example_startups.length < 2) {
+      throw new Error(`Website strategy card needs at least two example startups: ${file}`);
+    }
+  }
 }
 
 export function loadPatternCatalog(): PatternCard[] {
@@ -70,6 +127,15 @@ function terms(value: string): Set<string> {
   return new Set(value.toLowerCase().match(/[a-z0-9]+/gu) ?? []);
 }
 
+// Common prose words that appear in card titles and summaries but carry no
+// category signal in an idea. Excluded from query matching so natural-language
+// ideas do not surface unrelated cards.
+const QUERY_STOPWORDS = new Set([
+  "with", "for", "and", "the", "a", "an", "of", "to", "in", "on", "or", "your",
+  "you", "their", "from", "into", "that", "this", "is", "are", "be", "by", "at",
+  "it", "as", "its", "an",
+]);
+
 export function retrievePatterns(query: string, limit = 4): PatternRetrievalResult {
   if (!query.trim()) throw new Error("Pattern query must not be empty");
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 8) {
@@ -77,6 +143,7 @@ export function retrievePatterns(query: string, limit = 4): PatternRetrievalResu
   }
 
   const queryTerms = terms(query);
+  for (const stopword of QUERY_STOPWORDS) queryTerms.delete(stopword);
   const selected = loadPatternCatalog()
     .map((card) => {
       const weightedTerms = [

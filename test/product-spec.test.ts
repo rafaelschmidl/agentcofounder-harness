@@ -67,4 +67,12 @@ describe("ProductSpec v0.1 validation", () => {
     const result = validateProductSpec(candidate, SAMPLE_IDEA);
     expect(result.errors).toContain("selected_patterns references unknown pattern domain.unknown@1.0.0");
   });
+
+  it("accepts retrieved website strategy card IDs as selected patterns", () => {
+    const candidate = validProductSpec();
+    candidate.selected_patterns.push("website.strategy.commerce@1.0.0");
+    const result = validateProductSpec(candidate, SAMPLE_IDEA);
+    expect(result.valid).toBe(true);
+    expect(result.spec?.selected_patterns).toContain("website.strategy.commerce@1.0.0");
+  });
 });
