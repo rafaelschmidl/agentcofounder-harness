@@ -147,7 +147,9 @@ function semanticErrors(spec: ProductSpec, idea: string, expectedFragments: Sour
     ) {
       errors.push(`${requirement.provenance} requirement ${requirement.id} must use IMPLEMENT disposition`);
     }
-    if (requirement.disposition === "IMPLEMENT" && requirement.journey_ids.length === 0) {
+    // Scope constraints still retain provenance and compiler coverage, but do not
+    // fabricate a product interaction merely to attach them to a journey.
+    if (requirement.disposition === "IMPLEMENT" && requirement.kind !== "SCOPE" && requirement.journey_ids.length === 0) {
       errors.push(`implemented requirement ${requirement.id} must map to an acceptance journey`);
     }
     if (requirement.disposition !== "IMPLEMENT" && requirement.journey_ids.length > 0) {

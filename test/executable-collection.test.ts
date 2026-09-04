@@ -63,7 +63,7 @@ describe('opt-in executable collections', () => {
     expect(saas.validStored({ id: '1', customer: 'A', title: 'Export', category: 'Data', priority: 'critical', status: 'inbox' })).toBe(false);
   });
 
-  it('rejects a wrong initial state, unbound workflow action, or unsupported identifier rather than silently changing semantics', () => {
+  it('rejects a wrong initial state, unbound workflow action, or multiple identifiers rather than silently changing semantics', () => {
     const spec = publicCollectionSpec('saas');
     if (spec.collection_execution?.mode !== 'compiled') throw new Error('fixture');
     spec.collection_execution.contract.hidden!.status!.initial = 'shipped';
@@ -72,8 +72,9 @@ describe('opt-in executable collections', () => {
     spec.collection_execution.contract.actions.push({ id: 'shortcut', label: 'Shortcut', when: {}, assign: { status: 'shipped' }, message: 'Done.' });
     expect(validateProductSpec(spec, SAAS_IDEA).errors.join(' ')).toContain('bind to a canonical transition');
     spec.collection_execution.contract.actions.pop();
-    spec.entities[0]!.fields.push({ id: 'invoice_number', name: 'Invoice number', type: 'identifier', required: true, values: [], validation: [] });
-    expect(validateProductSpec(spec, SAAS_IDEA).errors.join(' ')).toContain('controller-owned id');
+    spec.entities[0]!.fields.push({ id: 'first_identity', name: 'First ID', type: 'identifier', required: true, values: [], validation: [] });
+    spec.entities[0]!.fields.push({ id: 'second_identity', name: 'Second ID', type: 'identifier', required: true, values: [], validation: [] });
+    expect(validateProductSpec(spec, SAAS_IDEA).errors.join(' ')).toContain('only one generated identifier');
   });
 
   it('rejects invalid field choices and guards direct action calls as well as controller calls', () => {
@@ -104,10 +105,35 @@ describe('opt-in executable collections', () => {
     expect(saas.validStored({ id: '2', title: 'Export', customer: 'Jo', category: 'Data', priority: ' high ', status: 'inbox' })).toBe(false);
   });
 
+  it('derives omitted required and enum metadata without changing the draft or hiding explicit conflicts', () => {
+    const spec = publicCollectionSpec('saas');
+    if (spec.collection_execution?.mode !== 'compiled') throw new Error('fixture');
+    delete spec.collection_execution.contract.fields[3]!.required;
+    delete spec.collection_execution.contract.fields[3]!.options;
+    delete spec.collection_execution.contract.hidden!.status!.choices;
+    const before = JSON.stringify(spec);
+    expect(validateProductSpec(spec, SAAS_IDEA).errors).toEqual([]);
+    const contract = executableContract(spec);
+    expect(contract.fields[3]!.required).toBe(true);
+    expect(contract.fields[3]!.options!.map((option) => option.value)).toEqual(['low', 'medium', 'high']);
+    expect(contract.hidden!.status!.choices).toEqual(['inbox', 'planned', 'in_progress', 'shipped']);
+    expect(JSON.stringify(spec)).toBe(before);
+    spec.collection_execution.contract.fields[3]!.required = false;
+    spec.collection_execution.contract.hidden!.status!.choices = ['inbox'];
+    const errors = validateProductSpec(spec, SAAS_IDEA).errors.join(' ');
+    expect(errors).toContain('required rule disagrees');
+    expect(errors).toContain('hidden.status.choices');
+    expect(errors).not.toContain('choose mode custom');
+  });
+
   it('materializes protected domain API, three owned files, honest repair scope, and rejects config tampering', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'executable-materialize-'));
     try {
-      const spec = publicCollectionSpec('book'), plan = compileProductSpec(spec, { executableCollection: true });
+      const spec = publicCollectionSpec('book');
+      spec.entities[0]!.fields.unshift({ id: 'fld_identity', name: 'Generated ID', type: 'identifier', required: true, values: [], validation: [] });
+      const plan = compileProductSpec(spec, { executableCollection: true });
+      expect(validateProductSpec(spec, BOOK_IDEA).errors).toEqual([]);
+      expect(executableContract(spec).canonicalIdentifier).toBe('fld_identity');
       expect(validateBuildPlan(plan, spec).errors).toEqual([]);
       await cp(path.resolve('app-template/AGENTS.md'), path.join(directory, 'AGENTS.md'));
       await materializeBuildPlan(plan, spec, directory);
@@ -118,6 +144,7 @@ describe('opt-in executable collections', () => {
       expect(prompts.systemPrompt).toContain('three AGENT-owned files');
       expect(prompts.appContext).toContain('export function useProductCollection');
       expect(prompts.appContext).toContain('"borrower"');
+      expect(prompts.appContext).toContain('"fld_identity":"id"');
       expect(prompts.appContext).not.toContain('export function compileCollection');
       const scoped = scopeRepairToOwnership({ key: 'x', sourceFingerprint: 'test', stage: 'tests', permittedPaths: ['src/product/domain.ts','src/product/product.test.tsx'], evidence: '## Permitted repair paths\n\n- src/product/domain.ts\n\n## Failure\n\nwrong result' }, plan);
       expect(scoped.permittedPaths).toEqual(['src/product/product.test.tsx']);

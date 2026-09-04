@@ -15,6 +15,8 @@ export type FieldRule = RecordField & { required?: boolean; initial?: string };
 export interface Guard { equals?: Record<string, string>; empty?: string[]; present?: string[] }
 export interface FlatCollectionContract {
   storageKey: string; noun: string; titleKey: string;
+  // Compiler metadata: canonical generated identifiers lower to the controller's id.
+  canonicalIdentifier?: string;
   fields: FieldRule[];
   hidden?: Record<string, { initial: string; choices?: string[]; required?: boolean }>;
   invariants?: Array<{ when: Guard; must: Guard; message: string }>;

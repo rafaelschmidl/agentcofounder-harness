@@ -61,6 +61,16 @@ describe("ProductSpec v0.1 validation", () => {
     expect(result.errors.join("\n")).toContain("mappings disagree");
   });
 
+  it("keeps scope constraints without inventing a product journey, while implemented behavior still requires one", () => {
+    const candidate = validProductSpec();
+    const scope = { id: "req_local_scope", title: "One local user", description: "Keep the app local to its owner.",
+      kind: "SCOPE" as const, provenance: "DEFAULT" as const, disposition: "IMPLEMENT" as const, source_refs: [], journey_ids: [] };
+    candidate.requirements.push(scope);
+    expect(validateProductSpec(candidate, SAMPLE_IDEA).errors).toEqual([]);
+    candidate.requirements.at(-1)!.kind = "FUNCTIONAL";
+    expect(validateProductSpec(candidate, SAMPLE_IDEA).errors).toContain("implemented requirement req_local_scope must map to an acceptance journey");
+  });
+
   it("rejects pattern IDs that were not bundled locally", () => {
     const candidate = validProductSpec();
     candidate.selected_patterns.push("domain.unknown@1.0.0");

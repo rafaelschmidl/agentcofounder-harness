@@ -8,10 +8,15 @@ export const EXECUTABLE_COLLECTION_BLOCK: CapabilityBlock = {
   capabilities: ['compiled-collection-domain'],
   dependencies: ['ui.collection-controller'], conflicts: [],
   owned_files: ['src/system/executable-collection.ts', 'src/product/domain.ts'],
-  exported_interfaces: ['definition', 'ProductRecord', 'useProductCollection', 'ProductEditor'],
+  exported_interfaces: ['definition', 'recordKeys', 'ProductRecord', 'useProductCollection', 'ProductEditor'],
   checks: ['canonical workflow source/target guards', 'complete-record invariants', 'field/enum validation'],
   materialize(config) {
     const contract = config.contract as FlatCollectionContract;
+    const recordKeys = Object.fromEntries([
+      ...contract.fields.map((field) => [field.key, field.key]),
+      ...Object.keys(contract.hidden ?? {}).map((key) => [key, key]),
+      ...(contract.canonicalIdentifier ? [[contract.canonicalIdentifier, 'id']] : []),
+    ]);
     return [{ path: 'src/system/executable-collection.ts', content: readFileSync(new URL('./contract.ts', import.meta.url), 'utf8') }, {
       path: 'src/product/domain.ts',
       content: `// Compiler-owned executable product semantics. Do not replace this module.
@@ -20,6 +25,7 @@ import { compileCollection } from "../system/executable-collection";
 import { CollectionEditor, useCollection, type CollectionController, type CollectionItem } from "../system/collection-controller";
 
 export type ProductRecord = CollectionItem;
+export const recordKeys = ${JSON.stringify(recordKeys)} as const;
 export const definition = compileCollection(${JSON.stringify(contract)});
 export function useProductCollection(): CollectionController { return useCollection(definition); }
 export function ProductEditor(props: { controller: CollectionController; className?: string; fieldsClassName?: string }): ReactElement {
