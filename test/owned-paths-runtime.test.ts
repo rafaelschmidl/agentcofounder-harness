@@ -9,7 +9,8 @@ import type { FileOwnership } from "../src/build-plan/types.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 type Write = { path: string; content: string };
-type Response = Write[] | "stop";
+type ToolCall = Write | { name: "edit" | "finish_repair"; arguments: Record<string, string> };
+type Response = ToolCall[] | "stop";
 
 /** Real installed Pi, its built-in write implementation, and a local HTTP provider. */
 async function runFixture(options: {
@@ -40,9 +41,10 @@ async function runFixture(options: {
       const planned = requests <= 5 ? await options.response(requests, app) : "stop";
       const delta = planned === "stop" ? { role: "assistant", content: "Done." } : {
         role: "assistant",
-        tool_calls: planned.map((args, index) => ({
+        tool_calls: planned.map((call, index) => ({
           index, id: `call-${requests}-${index}`, type: "function",
-          function: { name: "write", arguments: JSON.stringify(args) },
+          function: "name" in call ? { name: call.name, arguments: JSON.stringify(call.arguments) }
+            : { name: "write", arguments: JSON.stringify(call) },
         })),
       };
       response.writeHead(200, { "content-type": "text/event-stream" });
@@ -74,9 +76,10 @@ async function runFixture(options: {
     } }));
     const child = spawn(path.join(root, "node_modules/.bin/pi"), [
       "--mode", "json", "--print", "--offline", "--no-extensions", "--no-skills",
-      "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", "write",
+      "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", options.repair ? "write,edit,finish_repair" : "write",
       "--provider", "fixture", "--model", "fixture", "--thinking", "off",
       "--extension", path.join(root, "solution/extensions/owned-paths.ts"),
+      ...(options.repair ? ["--extension", path.join(root, "solution/extensions/repair-completion.ts")] : []),
       "--system-prompt", "Write the requested fixture files.", "Build the fixture.",
     ], {
       cwd: app, stdio: ["ignore", "pipe", "pipe"],
@@ -156,4 +159,34 @@ it("leaves a repair running after every owned file was written so it can make la
   });
   expect(result.requests).toBe(3);
   expect(result.content["app.ts"]).toBe("repair later correction");
+}, 20_000);
+
+it("drains writes and edits around a mixed repair handoff without a second HTTP request", async () => {
+  const result = await runFixture({
+    files: ["app.ts"], repair: true,
+    response: () => [
+      { path: "app.ts", content: "first correction" },
+      { name: "finish_repair", arguments: { summary: "Ready for verification after this batch." } },
+      { name: "edit", arguments: { path: "app.ts", oldText: "first correction", newText: "final correction" } },
+    ],
+  });
+  expect(result.requests).toBe(1);
+  expect(result.content["app.ts"]).toBe("final correction");
+  expect(result.events.filter((event) => event.type === "tool_execution_end")).toHaveLength(3);
+}, 20_000);
+
+it("retains an actual failed edit when a mixed repair batch also asks for handoff", async () => {
+  const result = await runFixture({
+    files: ["app.ts"], repair: true,
+    prepare: (app) => writeFile(path.join(app, "app.ts"), "original"),
+    response: (request) => request === 1 ? [
+      { name: "edit", arguments: { path: "app.ts", oldText: "missing text", newText: "replacement" } },
+      { name: "finish_repair", arguments: { summary: "Return the failed edit to verification." } },
+    ] : "stop",
+  });
+  // Native failed results cannot carry this extension's termination flag. Keep
+  // that limitation visible: the external harness remains the fallback here.
+  expect(result.requests).toBe(2);
+  expect(result.content["app.ts"]).toBe("original");
+  expect(result.events.filter((event) => event.type === "tool_execution_end" && event.isError)).toHaveLength(1);
 }, 20_000);
