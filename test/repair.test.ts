@@ -11,6 +11,40 @@ afterEach(async () => {
 });
 
 describe("diagnosed repair", () => {
+  it("groups repeated selector diagnostics while retaining every journey, distinct expectation, and runtime error", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "repair-grouped-evidence-"));
+    directories.push(directory);
+    const verification = path.join(directory, "verification");
+    const output = path.join(directory, "app");
+    await mkdir(verification);
+    const duplicate = "TestingLibraryElementError: Found multiple elements with the role button and name Add";
+    const snapshot = `\n\nIgnored nodes: comments, script, style\n<body>${"<div>Repeated DOM</div>".repeat(200)}</body>`;
+    await writeFile(path.join(verification, "app-test-results.json"), JSON.stringify({
+      testResults: [{ assertionResults: [
+        ...["journey_create", "journey_persist"].map((id, index) => ({
+          fullName: `[${id}] completes its workflow`, title: "completes its workflow", status: "failed",
+          failureMessages: [`${duplicate}${snapshot}\n    at ${output}/src/product/product.test.tsx:${50 + index}:2`],
+        })),
+        { title: "count remains unchanged", status: "failed", failureMessages: ["AssertionError: expected 2 to be 1\nExpected: 1\nReceived: 2"] },
+      ] }],
+    }));
+    const repeatedLog = `${duplicate}${snapshot}\n${duplicate}${snapshot}`;
+    await writeFile(path.join(verification, "app-test.log"), repeatedLog);
+    const compact = await collectRepairDiagnosis(verification, output, { tests: true });
+    expect(compact.evidence.match(/TestingLibraryElementError:/gu)).toHaveLength(1);
+    expect(compact.evidence).toContain("[journey_create]");
+    expect(compact.evidence).toContain("[journey_persist]");
+    expect(compact.evidence).toContain("product.test.tsx:50:2");
+    expect(compact.evidence).toContain("product.test.tsx:51:2");
+    expect(compact.evidence).toContain("Expected: 1\nReceived: 2");
+    expect(compact.evidence).toContain("Full app-test.log remains");
+    expect(compact.permittedPaths).toEqual(["src/product/App.tsx", "src/product/product.test.tsx"]);
+    await writeFile(path.join(verification, "app-test.log"), `${repeatedLog}\nUnhandled Errors\nQuotaExceededError: storage write rejected`);
+    const runtime = await collectRepairDiagnosis(verification, output, { tests: true });
+    expect(runtime.evidence).toContain("QuotaExceededError: storage write rejected");
+    expect(runtime.key).not.toBe(compact.key);
+  });
+
   it("leaves an unattempted diagnosis retryable after setup or transport failures", () => {
     const event = (stopReason: string) => JSON.stringify({ type: "message_end", message: { role: "assistant", stopReason } });
     expect(hasCompletedRepairResponse("")).toBe(false);
