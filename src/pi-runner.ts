@@ -226,9 +226,17 @@ export async function runPi(
       piChild = child;
       let timedOut = false;
       let killTimer: NodeJS.Timeout | undefined;
+      let stopRequested = false;
+      const requestStop = (): void => {
+        if (stopRequested) return;
+        stopRequested = true;
+        // Repeated SIGTERM can interrupt Pi's asynchronous disposal while it
+        // drains shutdown hooks. Keep observing evidence, but signal only once.
+        signalProcessTree(child, "SIGTERM");
+      };
       const timeout = setTimeout(() => {
         timedOut = true;
-        signalProcessTree(child, "SIGTERM");
+        requestStop();
         killTimer = setTimeout(() => signalProcessTree(child, "SIGKILL"), 5_000);
       }, timeoutMs);
 
@@ -239,7 +247,7 @@ export async function runPi(
         const toolStop = toolBudget.observe(summary);
         const filesComplete = completion.observe(summary);
         const handedOff = handoff.observe(summary);
-        if (responseStop || toolStop || filesComplete || handedOff) signalProcessTree(child, "SIGTERM");
+        if (responseStop || toolStop || filesComplete || handedOff) requestStop();
       };
 
       child.stdout.on("data", (chunk: Buffer) => {
