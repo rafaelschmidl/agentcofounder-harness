@@ -31,8 +31,16 @@ export function createCompletingWriteTool(appRoot: string, ownership: readonly F
       const result = await write.execute(...args);
       const absolute = path.resolve(appRoot, args[1].path);
       if (required.has(absolute)) completed.add(absolute);
+      const remaining = [...required].filter((candidate) => !completed.has(candidate))
+        .map((candidate) => path.relative(appRoot, candidate).split(path.sep).join("/"));
       return {
         ...result,
+        content: [...result.content, {
+          type: "text" as const,
+          text: remaining.length > 0
+            ? `After this write, required files still missing: ${remaining.join(", ")}. Complete these before polishing already-written files; verification follows completion.`
+            : "All required product files have been written. Returning to deterministic verification after this batch.",
+        }],
         // Pi evaluates every result's termination flag after the full batch has
         // drained. A getter lets earlier successful writes observe completion
         // by later writes without stopping a batch before its final correction.

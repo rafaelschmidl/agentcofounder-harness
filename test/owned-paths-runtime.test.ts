@@ -33,10 +33,13 @@ async function runFixture(options: {
   await writeFile(ownershipFile, JSON.stringify(ownership));
   await options.prepare?.(app);
   let requests = 0;
+  const requestBodies: { messages: { role: string; content: unknown }[] }[] = [];
   const serverErrors: unknown[] = [];
   const server = http.createServer(async (request, response) => {
     try {
-      for await (const _chunk of request) { /* Consume the actual SDK request. */ }
+      let requestBody = "";
+      for await (const chunk of request) requestBody += String(chunk);
+      requestBodies.push(JSON.parse(requestBody));
       requests += 1;
       const planned = requests <= 5 ? await options.response(requests, app) : "stop";
       const delta = planned === "stop" ? { role: "assistant", content: "Done." } : {
@@ -111,7 +114,7 @@ async function runFixture(options: {
     expect(assistant.every((event) => event.message.usage.totalTokens === 11)).toBe(true);
     expect(events.at(-1).type).toBe("agent_settled");
     const content = Object.fromEntries(await Promise.all(ownership.map(async (entry) => [entry.path, await readFile(path.join(app, entry.path), "utf8")])));
-    return { requests, events, content };
+    return { requests, events, content, requestBodies };
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -146,6 +149,9 @@ it("does not count duplicate writes, a failed write, or a blocked foundation wri
     },
   });
   expect(result.requests).toBe(2);
+  const toolFeedback = result.requestBodies[1]!.messages.filter((message) => message.role === "tool");
+  expect(JSON.stringify(toolFeedback)).toContain("required files still missing: styles.css");
+  expect(JSON.stringify(toolFeedback)).not.toContain("required files still missing: app.ts");
   expect(result.events.filter((event) => event.type === "tool_execution_end" && event.isError)).toHaveLength(2);
   expect(result.content).toMatchObject({ "app.ts": "second", "styles.css": "successful stylesheet", "system.ts": "immutable foundation" });
 }, 20_000);
