@@ -25,7 +25,7 @@ export function builderThinkingFromEnvironment(): string {
 export function builderExecutionContext(spec: ProductSpec, plan: BuildPlan) {
   return {
     product: spec.product,
-    requirements: spec.requirements.map(({ source_refs: _sources, provenance: _provenance, ...requirement }) => requirement),
+    requirements: spec.requirements.map(({ source_refs: _sources, provenance: _provenance, journey_ids: _reciprocalJourneys, ...requirement }) => requirement),
     entities: spec.entities,
     workflows: spec.workflows,
     persistence: spec.persistence,
@@ -37,11 +37,19 @@ export function builderExecutionContext(spec: ProductSpec, plan: BuildPlan) {
     resolved_conflicts: spec.conflicts.map(({ description, resolution }) => ({ description, resolution })),
     build: {
       blocks: plan.blocks.map(({ id, config }) => ({ id, config })),
-      custom_slots: plan.custom_slots,
+      custom_slots: plan.custom_slots.map(({ id, purpose }) => ({ id, purpose })),
       owned_paths: plan.file_ownership.filter((entry) => entry.owner === "AGENT").map((entry) => entry.path),
       routes: plan.routes,
       exports: plan.exports,
-      verification_obligations: plan.verification_obligations,
+      verification_obligations: plan.verification_obligations.map((obligation) => {
+        const journey = spec.acceptance_journeys.find((candidate) => candidate.id === obligation.journey_id);
+        // Preserve any noncanonical checks verbatim. The normal compiler repeats
+        // the journey's outcomes and requirement links, so its ID is sufficient.
+        return journey && JSON.stringify(obligation.checks) === JSON.stringify(journey.expected_outcomes)
+          && JSON.stringify(obligation.requirement_ids) === JSON.stringify(journey.requirement_ids)
+          ? { journey_id: obligation.journey_id }
+          : obligation;
+      }),
       install_allowed: plan.dependencies.install_allowed,
     },
   };
@@ -80,6 +88,7 @@ export function buildBuilderPiArguments(
     [
       "## Validated ProductSpec and BuildPlan — execution context",
       "The complete source-provenance artifacts remain on disk. This projection preserves all product behavior, exclusions, interfaces, and verification obligations needed for implementation.",
+      "Each verification obligation references the complete acceptance journey above, including its required outcomes. Materialized interface declarations are supplied separately; use them where they fit.",
       JSON.stringify(builderExecutionContext(spec, plan)),
       "",
       taskInstruction,
