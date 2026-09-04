@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { providerFromEnvironment } from "./provider.js";
+import { runLimitsFromEnvironment } from "./run-limits.js";
 
 const PASSTHROUGH = [
   "PATH",
@@ -18,6 +19,7 @@ export async function createPiEnvironment(
   stageDirectory: string,
   extra: NodeJS.ProcessEnv = {},
 ): Promise<NodeJS.ProcessEnv> {
+  const limits = runLimitsFromEnvironment();
   const { model } = providerFromEnvironment();
   const home = path.join(stageDirectory, "home");
   const piState = path.join(stageDirectory, "pi-state");
@@ -40,7 +42,7 @@ export async function createPiEnvironment(
         providers: {
           berget: {
             modelOverrides: {
-              [model]: { maxTokens: 8192 },
+              [model]: { maxTokens: limits.max_output_tokens_per_response },
             },
           },
         },

@@ -31,6 +31,7 @@ import {
 } from "./result.js";
 import { collectUsageFromJsonLines } from "./usage.js";
 import { RunTrace } from "./trace.js";
+import { MAX_PROVIDER_RESPONSES, runLimitsFromEnvironment } from "./run-limits.js";
 import { buildSemanticReviewInput, MAX_REVIEW_RESPONSES, runSemanticReview, semanticReviewRepairDiagnosis } from "./semantic-review.js";
 import type { AppVerification, RunResult } from "./types.js";
 import { validateResultObject } from "./validate-result.js";
@@ -42,12 +43,11 @@ interface Arguments {
   prepareOnly: boolean;
   skipAppInstall: boolean;
   verificationPort: number;
+  printRunLimits: boolean;
 }
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
-const MAX_PROVIDER_RESPONSES = 32;
-const MAX_PROVIDER_OUTPUT_TOKENS = 8_192;
 
 export { runPi, type CommandResult } from "./pi-runner.js";
 
@@ -126,6 +126,7 @@ Options:
   --prepare-only          Reset the app from the seed without invoking Pi
   --skip-app-install      Do not run npm ci in the generated app
   --verification-port <n> Development verification port (default: 3000; delivered app contract is unchanged)
+  --print-run-limits      Print validated response limits without preparing an app or invoking Pi
   --help                  Show this help
 
 Environment:
@@ -133,6 +134,7 @@ Environment:
   CHALLENGE_MODEL         Optional Pi model override
   CHALLENGE_THINKING      Optional Pi thinking level (default: off)
   CHALLENGE_BUILDER_THINKING Optional builder thinking level (default: off)
+  CHALLENGE_MAX_OUTPUT_TOKENS Per-response output cap, including reasoning (default: 8192; maximum: 32768)
   CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 1800000)
   CHALLENGE_SEMANTIC_REVIEW Set to 1 for an experimental source review after functional checks (default: off)
 `);
@@ -145,6 +147,7 @@ export function parseArguments(argv: string[]): Arguments {
     prepareOnly: false,
     skipAppInstall: false,
     verificationPort: 3000,
+    printRunLimits: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -155,6 +158,10 @@ export function parseArguments(argv: string[]): Arguments {
     }
     if (argument === "--prepare-only") {
       parsed.prepareOnly = true;
+      continue;
+    }
+    if (argument === "--print-run-limits") {
+      parsed.printRunLimits = true;
       continue;
     }
     if (argument === "--skip-app-install") {
@@ -238,6 +245,11 @@ function timeoutFromEnvironment(): number {
 
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2));
+  const runLimits = runLimitsFromEnvironment();
+  if (args.printRunLimits) {
+    console.log(JSON.stringify(runLimits));
+    return;
+  }
   const runDeadline = Date.now() + timeoutFromEnvironment();
   const remainingTime = (): number => {
     const remaining = runDeadline - Date.now();
@@ -270,10 +282,11 @@ async function main(): Promise<void> {
     mkdir(interpreterDirectory, { recursive: true }),
     mkdir(builderDirectory, { recursive: true }),
   ]);
+  await writeFile(path.join(REPOSITORY_ROOT, "artifacts", "run-limits.json"), `${JSON.stringify(runLimits, null, 2)}\n`, "utf8");
   await writeFile(path.join(artifactDirectory, "idea.txt"), idea, "utf8");
   traceFile = path.join(artifactDirectory, "trace.jsonl");
   trace = await RunTrace.create(traceFile);
-  await trace.record("interpretation", "started", "Started ProductSpec interpretation from the raw idea.");
+  await trace.record("interpretation", "started", "Started ProductSpec interpretation from the raw idea.", { run_limits: runLimits });
 
   const appPortHadListenerBeforePi = await portHasListener(args.verificationPort);
   const interpretation = await runProductSpecInterpretation(idea, interpreterDirectory, remainingTime());
@@ -498,7 +511,7 @@ async function main(): Promise<void> {
   await writeFile(eventFile, eventContent, { encoding: "utf8", flag: "wx" });
   const usage = collectUsageFromJsonLines(eventContent);
   const responseLimitPassed = usage.model_calls <= MAX_PROVIDER_RESPONSES &&
-    usage.call_log.every((call) => call.output_tokens <= MAX_PROVIDER_OUTPUT_TOKENS);
+    usage.call_log.every((call) => call.output_tokens <= runLimits.max_output_tokens_per_response);
   const piExitCode = interpretation.command.exitCode !== 0
     ? interpretation.command.exitCode
     : customizationExitCode !== 0 || !responseLimitPassed
@@ -526,6 +539,7 @@ async function main(): Promise<void> {
     status: result.status,
     model_calls: result.model_calls,
     cost_total: result.cost_total,
+    run_limits: runLimits,
   });
   await copyFile(traceFile, path.join(outputDirectory, "trace.jsonl"));
 

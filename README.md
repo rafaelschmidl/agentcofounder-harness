@@ -44,6 +44,8 @@ Never commit credentials. `.env.example` documents variable names, but the runne
 
 The current development defaults target Berget `zai-org/GLM-5.2` with its supported `off` thinking mode for direct structured submission, code generation, and diagnosed repair. GLM-5.2 exposes `off`, `high`, and `max`; unsupported intermediate labels are avoided. All values remain configurable through `CHALLENGE_THINKING`, `CHALLENGE_INTERPRETER_THINKING`, and `CHALLENGE_BUILDER_THINKING`. The evaluator retains both Pi-reported cost and the website's weighted-token metric because organizers have not reconciled their newer cost guidance with the published ranking text.
 
+`CHALLENGE_MAX_OUTPUT_TOKENS` sets the per-response output cap, including thinking tokens: default `8192`, valid integer range `1..32768` for the installed GLM-5.2 configuration. For example, set it to `32768` when testing longer reasoning responses. `npm run challenge -- --print-run-limits` validates and prints the resolved cap and the 32-response output envelope without preparing an app or invoking Pi. The same values configure every stage's Pi model and are retained in `artifacts/run-limits.json` and the run trace.
+
 The strict Node engine is intentional. `npm ci` fails on Node 23+ (including Node 26); use `.nvmrc` or the provided container rather than regenerating the lockfile with a newer runtime.
 
 The Docker build runs the full check suite, including short-lived Vite servers over the builder's loopback interface. The image declares port 3000 for organizer-controlled browser evaluation; publishing that port still requires an explicit container port mapping or shared container network.
