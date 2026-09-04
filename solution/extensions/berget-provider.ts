@@ -2,6 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { resolveOfficialBergetExtension } from "../../src/provider.js";
+import { withProviderRequestTelemetry } from "../../src/provider-request-telemetry.js";
 
 type Initializer = (pi: ExtensionAPI) => Promise<void>;
 const MAX_STARTUP_ATTEMPTS = 3;
@@ -40,5 +41,5 @@ export async function initializeBergetWithRetry(
 
 export default async function bergetProvider(pi: ExtensionAPI): Promise<void> {
   const installed = await import(pathToFileURL(resolveOfficialBergetExtension()).href) as { default: Initializer };
-  await initializeBergetWithRetry(pi, installed.default);
+  await initializeBergetWithRetry(withProviderRequestTelemetry(pi, process.env.SYSTEM_V0_PROVIDER_REQUEST_LOG), installed.default);
 }

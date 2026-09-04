@@ -14,6 +14,7 @@ describe("isolated Pi environment", () => {
       expect(environment.HOME).toBe(path.join(directory, "home"));
       expect(environment.CHALLENGE_SECRET).toBeUndefined();
       expect(environment.SYSTEM_V0_STAGE).toBe("interpreter");
+      expect(environment.SYSTEM_V0_PROVIDER_REQUEST_LOG).toBe(path.join(directory, "provider-requests.jsonl"));
       const models = JSON.parse(
         await readFile(path.join(directory, "pi-state", "models.json"), "utf8"),
       ) as { providers: { berget: { modelOverrides: Record<string, { maxTokens: number }> } } };
