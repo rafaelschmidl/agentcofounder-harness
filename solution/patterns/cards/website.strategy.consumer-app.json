@@ -1,0 +1,24 @@
+{
+  "id": "website.strategy.consumer-app@1.0.0",
+  "title": "Consumer app website with acquisition funnel",
+  "summary": "A product site whose job is to funnel visitors into signing up or installing, set expectations of the app's core loop, and get new users to first value.",
+  "signals": ["sign up", "get started", "download", "install", "free account", "create account", "login", "app store", "streak", "daily goal", "onboarding", "quiz", "social", "friends", "habit"],
+  "capabilities": ["signup-funnel", "first-run-onboarding", "core-loop-preview", "social-proof", "simple-value-proposition"],
+  "defaults": ["Make signup or install the single dominant action", "Preview the app's actual core surfaces, not marketing abstractions", "Treat onboarding and first-run empty states as spec views"],
+  "risks": ["Marketing copy with no visible product surfaces", "Signup not modeled as a first-class flow", "Missing empty or first-run states"],
+  "verification": ["Reach signup or install in one obvious step", "Complete a first-run onboarding path to first value", "See the app's core surface with sensible empty-state content"],
+  "site_goals": ["Acquire users by driving signup or install", "Get new users to first value through onboarding", "Set expectations of the app's core loop before signup"],
+  "typical_views": [
+    {"name": "Landing page", "purpose": "Sell the app's promise and route visitors into signup or install"},
+    {"name": "Signup or onboarding", "purpose": "Create the account and reach first value with minimal steps"},
+    {"name": "Personal feed or dashboard", "purpose": "Deliver the personalized core loop of the product"},
+    {"name": "Profile", "purpose": "Hold the user's identity, activity, and settings"},
+    {"name": "Empty and first-run states", "purpose": "Guide brand-new users toward their first meaningful action"}
+  ],
+  "common_components": ["hero with signup CTA", "app preview imagery", "benefit highlight trio", "social proof band", "step-by-step onboarding checklist", "progress and streak indicators", "empty-state guidance card"],
+  "example_startups": [
+    {"name": "Spotify", "note": "One dominant free-signup funnel with tier comparison"},
+    {"name": "Duolingo", "note": "Onboarding-first marketing that starts the loop before signup feels real"},
+    {"name": "Notion", "note": "Template gallery as the acquisition surface for a freemium tool"}
+  ]
+}

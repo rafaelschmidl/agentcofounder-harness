@@ -8,6 +8,12 @@
     "cards/checkout.stubbed.json",
     "cards/metrics.derived.json",
     "cards/domain.commerce.json",
-    "cards/domain.saas-operations.json"
+    "cards/domain.saas-operations.json",
+    "cards/website.strategy.commerce.json",
+    "cards/website.strategy.saas-demo.json",
+    "cards/website.strategy.consumer-app.json",
+    "cards/website.strategy.marketplace.json",
+    "cards/website.strategy.community-content.json",
+    "cards/website.strategy.booking-appointments.json"
   ]
 }

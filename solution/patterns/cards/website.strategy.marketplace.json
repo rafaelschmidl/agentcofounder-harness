@@ -1,0 +1,25 @@
+{
+  "id": "website.strategy.marketplace@1.0.0",
+  "title": "Two-sided marketplace website",
+  "summary": "A platform site where buyers and sellers must find each other and transact: searchable listings, rich listing detail, a trust layer, and a parallel funnel for the scarce supply side.",
+  "signals": ["marketplace", "listings", "sellers", "buyers", "hosts", "rental", "gigs", "vendors", "peer-to-peer", "two-sided", "verified", "instant book", "browse listings", "filter listings", "commission"],
+  "capabilities": ["listing-search", "listing-detail", "buyer-flow", "seller-onboarding", "trust-signals", "reviews-and-ratings"],
+  "defaults": ["Search or browse the listings in one step from the landing view", "Model buyer and seller as distinct roles with separate paths", "Show trust signals (ratings, reviews, profiles) next to every offer"],
+  "risks": ["Single undifferentiated user role instead of the two sides", "No search-plus-filter pattern for discovering listings", "Trust layer (reviews, ratings) missing from offers"],
+  "verification": ["Search or filter listings and open a listing detail view", "Complete a buyer-side booking or purchase path", "Join or publish as the seller side and see the listing appear"],
+  "site_goals": ["Acquire and transact both sides of the market", "Acquire the scarce supply side (sellers, hosts, providers)", "Build trust between strangers with ratings, reviews, and profiles"],
+  "typical_views": [
+    {"name": "Discovery landing", "purpose": "Route visitors straight into searching or browsing listings"},
+    {"name": "Listing search", "purpose": "Filter and compare offers across the catalogue"},
+    {"name": "Listing detail", "purpose": "Present one offer with price, provider identity, and trust signals"},
+    {"name": "Booking or purchase flow", "purpose": "Commit a buyer-side transaction on a specific listing"},
+    {"name": "Seller onboarding", "purpose": "Let the supply side join and publish their first listing"},
+    {"name": "Seller or provider profile", "purpose": "Build trust around the person or business behind offers"}
+  ],
+  "common_components": ["search bar with filters", "listing grid or map", "listing card with rating", "listing detail gallery", "booking or purchase panel", "review and rating display", "seller or host profile card", "trust badges", "become-a-seller CTA"],
+  "example_startups": [
+    {"name": "Airbnb", "note": "Search-as-hero with a complete trust stack and host funnel"},
+    {"name": "Fiverr", "note": "Catalog-with-faces listings carrying seller identity"},
+    {"name": "Zillow", "note": "Search-first with map and list duality on rich listing detail"}
+  ]
+}

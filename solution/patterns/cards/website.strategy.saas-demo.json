@@ -1,0 +1,25 @@
+{
+  "id": "website.strategy.saas-demo@1.0.0",
+  "title": "SaaS product website with demo-request motion",
+  "summary": "A software product site whose job is to prove value fast and convert visitors into booked demos or qualified leads through visual proof, pricing logic, and social evidence.",
+  "signals": ["saas", "b2b", "demo", "book a demo", "demo request", "free trial", "per seat", "contact sales", "enterprise", "solution", "software", "pricing tier", "case study", "compliance", "integrations"],
+  "capabilities": ["value-proposition-hero", "feature-tour", "pricing-tiers", "customer-evidence", "demo-request-form", "faq"],
+  "defaults": ["Make the demo or contact request the single dominant CTA", "Show the product itself, not only abstractions", "Anchor credibility with customer evidence and pricing logic"],
+  "risks": ["Feature paragraphs without any product visual", "No pricing page at all", "No single obvious demo or contact path"],
+  "verification": ["Reach the demo or contact form in one obvious step", "Review pricing tiers and what changes between them", "Find customer or product evidence supporting the claims"],
+  "site_goals": ["Book demos and capture qualified leads", "Demonstrate product value quickly with visual product proof", "Establish credibility with customers, case evidence, and pricing logic"],
+  "typical_views": [
+    {"name": "Landing hero", "purpose": "State the value proposition and route to the demo request immediately"},
+    {"name": "Product tour", "purpose": "Show the product working with feature highlights and screenshots"},
+    {"name": "Pricing", "purpose": "Explain tiers and what changes between them to pre-qualify leads"},
+    {"name": "Customer evidence", "purpose": "Build credibility with case studies, testimonials, and logos"},
+    {"name": "Demo or contact form", "purpose": "Capture leads with minimal friction and clear expectations"},
+    {"name": "FAQ", "purpose": "Answer adoption objections that block demo requests"}
+  ],
+  "common_components": ["value-proposition hero", "primary CTA button", "feature highlight section", "product screenshot or preview", "pricing tier table", "testimonial band", "customer logo row", "demo request form", "faq accordion"],
+  "example_startups": [
+    {"name": "Salesforce", "note": "Segment-picked landing paths and demo forms everywhere"},
+    {"name": "HubSpot", "note": "Large platform hero backed by heavy case-study evidence"},
+    {"name": "Linear", "note": "Tighter self-serve-leaning flow with polished product shots"}
+  ]
+}
