@@ -7,9 +7,11 @@ export const BASE_UI_STYLES = `@layer foundation {
   --ink: #202923;
   --muted: #667168;
   --line: #dedfd7;
+  --line-strong: #b8c0b6;
   --accent: #245c43;
   --accent-hover: #194631;
   --accent-soft: #e8f0e9;
+  --on-accent: #ffffff;
   --danger: #a63232;
   --danger-soft: #fff0ee;
   --success: #256145;
@@ -45,7 +47,7 @@ p { margin-bottom: .75rem; }
 .app-shell { width: min(1180px, calc(100% - 64px)); margin-inline: auto; padding: 36px 0 64px; }
 .app-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-bottom: 28px; margin-bottom: 28px; border-bottom: 1px solid var(--line); }
 .app-identity { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
-.product-mark { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 12px; color: #fff; background: var(--accent); font-size: 1.35rem; font-weight: 700; line-height: 1; }
+.product-mark { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 12px; color: var(--on-accent); background: var(--accent); font-size: 1.35rem; font-weight: 700; line-height: 1; }
 .app-heading { min-width: 0; }
 .eyebrow { margin: 0 0 5px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; font-size: .68rem; font-weight: 750; }
 .subtitle { max-width: 64ch; margin: 8px 0 0; color: var(--muted); font-size: .925rem; }
@@ -74,9 +76,9 @@ p { margin-bottom: .75rem; }
   line-height: 1.3; text-align: center; text-decoration: none; cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
-:where(button, .button):hover:not(:disabled) { background: var(--surface-muted); border-color: #b8c0b6; }
+:where(button, .button):hover:not(:disabled) { background: var(--surface-muted); border-color: var(--line-strong); }
 :where(button, .button):active:not(:disabled) { box-shadow: inset 0 1px 3px #17221c15; }
-:where(button[type="submit"], .button-primary, [data-variant="primary"]) { background: var(--accent); border-color: var(--accent); color: #fff; }
+:where(button[type="submit"], .button-primary, [data-variant="primary"]) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 :where(button[type="submit"], .button-primary, [data-variant="primary"]):hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 :where(.button-ghost, [data-variant="ghost"]) { background: transparent; border-color: transparent; }
 :where(.button-danger, [data-variant="danger"]) { color: var(--danger); }
@@ -89,12 +91,12 @@ p { margin-bottom: .75rem; }
 :where(legend) { margin-bottom: 12px; font-weight: 700; }
 :where(label) { display: block; color: var(--ink); font-size: .875rem; font-weight: 600; }
 :where(label) > :where(input, select, textarea) { margin-top: 6px; }
-:where(input, select, textarea) { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #cfd4cb; border-radius: 7px; color: var(--ink); background: var(--surface); font-size: 1rem; line-height: 1.35; }
-:where(input, textarea)::placeholder { color: #8a9288; }
+:where(input, select, textarea) { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink); background: var(--surface); font-size: 1rem; line-height: 1.35; }
+:where(input, textarea)::placeholder { color: var(--muted); }
 :where(input, select, textarea):focus { border-color: var(--accent); }
 :where(input, textarea)[readonly] { background: var(--surface-muted); }
 :where(input, select, textarea):disabled { cursor: not-allowed; background: var(--surface-muted); color: var(--muted); }
-:where(input, select, textarea)[aria-invalid="true"] { border-color: var(--danger); background: #fffafa; }
+:where(input, select, textarea)[aria-invalid="true"] { border-color: var(--danger); background: var(--danger-soft); }
 :where(input[type="checkbox"], input[type="radio"]) { display: inline-block; width: 18px; min-height: 18px; height: 18px; padding: 0; accent-color: var(--accent); vertical-align: middle; }
 :where(input[type="hidden"]) { display: none; }
 :where(textarea) { min-height: 100px; resize: vertical; }

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import type { BuildPlan } from "./build-plan/types.js";
+import { foundationDesignContext } from "./build-plan/foundation-context.js";
 import type { ProductSpec } from "./product-spec/types.js";
 import { providerFromEnvironment, providerPiArguments } from "./provider.js";
 
@@ -142,7 +143,7 @@ export async function loadBuilderPrompts(
     .join("\n\n");
   return {
     systemPrompt,
-    appContext: `${appInstructions.trim()}\n\n## Materialized system interfaces\n\n${interfaceContext}`,
+    appContext: `${appInstructions.trim()}\n\n${foundationDesignContext()}\n\n## Materialized system interfaces\n\n${interfaceContext}`,
   };
 }
 
