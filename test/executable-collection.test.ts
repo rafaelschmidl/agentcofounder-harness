@@ -84,6 +84,26 @@ describe('opt-in executable collections', () => {
     expect(() => compileCollection(contract)).toThrow('duplicate choices');
   });
 
+  it('preserves optional hidden enum absence and rejects padded stored enums that filters cannot classify', () => {
+    const spec = publicCollectionSpec('book');
+    if (spec.collection_execution?.mode !== 'compiled') throw new Error('fixture');
+    spec.entities[0]!.fields.push({ id: 'label', name: 'Label', type: 'enum', required: false, values: ['work', 'home'], validation: [] });
+    spec.collection_execution.contract.hidden!.label = { initial: '', choices: ['work', 'home'] };
+    expect(validateProductSpec(spec, BOOK_IDEA).errors).toEqual([]);
+    const definition = compileCollection(executableContract(spec));
+    const record = { id: '1', title: 'Example', author: 'Ursula', category: 'Novel', borrower: '', label: '' };
+    expect(definition.validStored(record)).toBe(true);
+    expect(definition.validStored({ ...record, label: 'home' })).toBe(true);
+    expect(definition.validStored({ ...record, label: ' home ' })).toBe(false);
+    const required = structuredClone(spec);
+    required.entities[0]!.fields.at(-1)!.required = true;
+    if (required.collection_execution?.mode !== 'compiled') throw new Error('fixture');
+    required.collection_execution.contract.hidden!.label!.required = true;
+    expect(validateProductSpec(required, BOOK_IDEA).errors.join(' ')).toContain('Required hidden default is empty');
+    const saas = compileCollection(executableContract(publicCollectionSpec('saas')));
+    expect(saas.validStored({ id: '2', title: 'Export', customer: 'Jo', category: 'Data', priority: ' high ', status: 'inbox' })).toBe(false);
+  });
+
   it('materializes protected domain API, three owned files, honest repair scope, and rejects config tampering', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'executable-materialize-'));
     try {

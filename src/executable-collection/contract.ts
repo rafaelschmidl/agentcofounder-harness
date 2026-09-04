@@ -30,8 +30,8 @@ export interface FlatCollectionContract {
 
 function fieldErrors(fields: FieldRule[], values: CollectionValues): CollectionErrors {
   return Object.fromEntries(fields.flatMap((field) => {
-    const value = values[field.key]?.trim() ?? '';
-    if (field.required && !value) return [[field.key, `${field.label} is required.`]];
+    const value = values[field.key] ?? '';
+    if (field.required && !value.trim()) return [[field.key, `${field.label} is required.`]];
     if (value && field.options && !field.options.some((option) => option.value === value)) return [[field.key, `Choose a valid ${field.label.toLowerCase()}.`]];
     return [];
   }));
@@ -50,7 +50,8 @@ export function compileCollection(contract: FlatCollectionContract): CollectionD
   if (new Set(keys).size !== keys.length || keys.some((key) => ['id', '__proto__', 'constructor', 'prototype'].includes(key)) || !keys.includes(contract.titleKey)
     || new Set(ids).size !== ids.length) throw new Error('Duplicate/reserved field, action, or invalid title key.');
   for (const [key, rule] of Object.entries(hidden)) {
-    if (rule.choices && !rule.choices.includes(rule.initial)) throw new Error(`Invalid hidden default: ${key}`);
+    if (rule.choices && (rule.choices.length === 0 || new Set(rule.choices).size !== rule.choices.length)) throw new Error(`Empty or duplicate choices: ${key}`);
+    if (rule.choices && rule.initial !== '' && !rule.choices.includes(rule.initial)) throw new Error(`Invalid hidden default: ${key}`);
     if (rule.required && !rule.initial.trim()) throw new Error(`Required hidden default is empty: ${key}`);
   }
   const guardKeys = (guard: Guard) => [...Object.keys(guard.equals ?? {}), ...(guard.empty ?? []), ...(guard.present ?? [])];
@@ -78,7 +79,7 @@ export function compileCollection(contract: FlatCollectionContract): CollectionD
     validStored: (record) => Object.keys(record).every((key) => key === 'id' || keys.includes(key))
       && keys.every((key) => typeof record[key] === 'string')
       && !Object.keys(fieldErrors(contract.fields, record)).length
-      && Object.entries(hidden).every(([key, rule]) => (!rule.required || Boolean(record[key]?.trim())) && (!rule.choices || rule.choices.includes(record[key] ?? '')))
+      && Object.entries(hidden).every(([key, rule]) => (!rule.required || Boolean(record[key]?.trim())) && (!rule.choices || record[key] === '' || rule.choices.includes(record[key] ?? '')))
       && (contract.invariants ?? []).every((rule) => !matchesGuard(rule.when, record) || matchesGuard(rule.must, record))
       && (!contract.state_binding || Object.values(contract.state_binding.states).filter((guard) => matchesGuard(guard, record)).length === 1),
     actions: contract.actions.map((action) => ({
