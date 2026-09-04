@@ -21,7 +21,7 @@ import { createPiEnvironment } from "./pi-environment.js";
 import { runPi } from "./pi-runner.js";
 import { runProductSpecInterpretation } from "./product-spec/interpreter.js";
 import { auditAppPortAfterPi } from "./port-owner.js";
-import { collectRepairDiagnosis, MAX_REPAIR_CYCLES, type RepairDiagnosis } from "./repair.js";
+import { collectRepairDiagnosis, hasCompletedRepairResponse, MAX_REPAIR_CYCLES, type RepairDiagnosis } from "./repair.js";
 import {
   composeResult,
   missingRequiredResultPaths,
@@ -423,7 +423,6 @@ async function main(): Promise<void> {
         });
         break;
       }
-      diagnosisKeys.add(diagnosis.key);
       const priorEvents = (await Promise.all(stageEventFiles.map((file) => readFile(file, "utf8")))).join("");
       const remainingCalls = MAX_PROVIDER_RESPONSES - collectUsageFromJsonLines(priorEvents).model_calls;
       if (remainingCalls < 1) {
@@ -477,6 +476,8 @@ async function main(): Promise<void> {
         ["finish_repair"],
       );
       stageEventFiles.push(repairEvents);
+      const repairReachedModel = hasCompletedRepairResponse(await readFile(repairEvents, "utf8"));
+      if (repairReachedModel) diagnosisKeys.add(diagnosis.key);
       customizationExitCode = repair.exitCode;
       runTimedOut ||= repair.timedOut;
       await trace.record(
@@ -489,6 +490,7 @@ async function main(): Promise<void> {
           attempt: repairAttempt,
           diagnosis_key: diagnosis.key,
           exit_code: repair.exitCode,
+          completed_model_response: repairReachedModel,
           successful_tool_calls: repair.successfulToolCalls,
           completion_tool: repair.completionTool,
         },

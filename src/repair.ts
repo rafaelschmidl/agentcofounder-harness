@@ -6,6 +6,19 @@ export const MAX_REPAIR_CYCLES = 7;
 const MAX_LOG_CHARACTERS = 12_000;
 const ANSI_ESCAPE = /\u001b\[[0-9;]*m/gu;
 
+/** Setup failures and transport errors did not let the model address a diagnosis. */
+export function hasCompletedRepairResponse(events: string): boolean {
+  return events.split(/\r?\n/u).some((line) => {
+    try {
+      const event = JSON.parse(line);
+      return event.type === "message_end" && event.message?.role === "assistant"
+        && ["stop", "toolUse", "length"].includes(event.message.stopReason);
+    } catch {
+      return false;
+    }
+  });
+}
+
 export interface RepairDiagnosis {
   key: string;
   sourceFingerprint: string;
