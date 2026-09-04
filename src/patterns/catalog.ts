@@ -127,6 +127,10 @@ function terms(value: string): Set<string> {
   return new Set(value.toLowerCase().match(/[a-z0-9]+/gu) ?? []);
 }
 
+function phrase(value: string): string {
+  return ` ${(value.toLowerCase().match(/[a-z0-9]+/gu) ?? []).join(" ")} `;
+}
+
 // Common prose words that appear in card titles and summaries but carry no
 // category signal in an idea. Excluded from query matching so natural-language
 // ideas do not surface unrelated cards.
@@ -143,11 +147,18 @@ export function retrievePatterns(query: string, limit = 4): PatternRetrievalResu
   }
 
   const queryTerms = terms(query);
+  const queryPhrase = phrase(query);
   for (const stopword of QUERY_STOPWORDS) queryTerms.delete(stopword);
   const selected = loadPatternCatalog()
     .map((card) => {
+      // Website vocabulary includes phrases such as "book a demo" and "return policy".
+      // Credit their signal only when the whole ordered phrase occurs, not each
+      // isolated word. Preserve the existing mechanical-card scoring contract.
+      const signals = card.id.startsWith(WEBSITE_STRATEGY_PREFIX)
+        ? card.signals.filter((signal) => queryPhrase.includes(phrase(signal)))
+        : card.signals;
       const weightedTerms = [
-        ...card.signals.flatMap((signal) => [...terms(signal), ...terms(signal)]),
+        ...signals.flatMap((signal) => [...terms(signal), ...terms(signal)]),
         ...terms(card.title),
         ...terms(card.summary),
         ...card.capabilities.flatMap((capability) => [...terms(capability)]),

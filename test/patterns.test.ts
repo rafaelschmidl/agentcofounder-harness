@@ -79,6 +79,52 @@ describe("offline pattern catalogue", () => {
     expect(selected.map((result) => result.card.id).filter((id) => id.startsWith("website.strategy."))).toEqual([]);
   });
 
+  it.each([
+    "book", "now", "return", "account", "daily", "now book", "policy then return", "booklet now",
+    "Keep a supplier address book, contact names and account notes",
+    "Track borrowed equipment and return dates",
+    "Plan daily tasks and mark completed items",
+  ])("does not treat fragments of website signal phrases as complete category evidence: %s", (query) => {
+    const websites = retrievePatterns(query, 8).selected.filter(({ card }) => card.id.startsWith("website.strategy."));
+    expect(websites).toEqual([]);
+  });
+
+  it.each([
+    ["BOOK-now", "booking-appointments"],
+    ["RETURN-policy", "commerce"],
+    ["book a DEMO", "saas-demo"],
+    ["daily goal", "consumer-app"],
+    ["peer-to-peer", "marketplace"],
+    ["community members publish articles", "community-content"],
+  ])("still retrieves a valid website category from complete normalized signals: %s", (query, category) => {
+    const selected = retrievePatterns(query, 8).selected;
+    expect(selected.map(({ card }) => card.id)).toContain(`website.strategy.${category}@1.0.0`);
+  });
+
+  it("keeps independent single-word evidence while refusing a separated multiword bonus", () => {
+    const result = retrievePatterns("book the demo", 8).selected.find(({ card }) => card.id === "website.strategy.saas-demo@1.0.0");
+    expect(result).toBeDefined(); // "demo" is also an explicit, valid standalone signal.
+    expect(result?.matched_terms).toContain("demo");
+    expect(result?.matched_terms).not.toContain("book");
+  });
+
+  it("retains the public lending prompt's mechanical cards without new commerce or booking contamination", () => {
+    const query = "My family is always borrowing books off my shelves and I never remember who has what. I'd like something simple where I can put in each book, the title, who wrote it, and roughly what kind of book it is, like a novel or a cookbook or a reference thing. When someone borrows one I want to note down their name, and when it comes back I want to clear that off. Mostly I just want to open it up and see everything I own in one list, and be able to pick out just the ones that are currently out with someone. It'd be nice to see how many are lent out right now. If I add a book by mistake I need to be able to fix it or take it off the list. It's just me using it on my own computer.";
+    const selected = retrievePatterns(query, 4).selected.map(({ card }) => card.id);
+    expect(selected).toContain("crud.collection@1.0.0");
+    expect(selected).toContain("metrics.derived@1.0.0");
+    expect(selected).toContain("persistence.local@1.0.0");
+    expect(selected).not.toContain("website.strategy.commerce@1.0.0");
+    expect(selected).not.toContain("website.strategy.booking-appointments@1.0.0");
+  });
+
+  it("preserves mechanical-card scores for an existing commerce query", () => {
+    const selected = retrievePatterns("shop product stock cart checkout payment declined order total", 8).selected;
+    expect(selected.find(({ card }) => card.id === "domain.commerce@1.0.0")).toMatchObject({ score: 18 });
+    expect(selected.find(({ card }) => card.id === "checkout.stubbed@1.0.0")).toMatchObject({ score: 14 });
+    expect(selected.find(({ card }) => card.id === "transaction.atomic@1.0.0")).toMatchObject({ score: 8 });
+  });
+
   it("does not crowd mechanical cards out of their own retrieval", () => {
     const mechanicalIdea = "shop product stock cart checkout payment declined order total";
     const selected = retrievePatterns(mechanicalIdea, 8).selected.map((result) => result.card.id);
