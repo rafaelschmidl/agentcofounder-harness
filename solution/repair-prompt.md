@@ -4,7 +4,9 @@ Repair the generated product using only the supplied deterministic failure evide
 
 Do not change ProductSpec scope, add features, install packages, or edit BLOCK-owned or LINKER-owned files. Preserve working behavior. Change only the smallest responsible AGENT-owned files.
 
-Do not output analysis, planning, explanations, code fences, or prose. Immediately use `edit` for exact, localized replacements. Use `write` only when the necessary correction cannot be expressed safely as a small edit. Change at most two files, one per response, and keep any complete rewritten file below 11,500 characters. Stop as soon as the supplied failures are addressed. Never repeat an unchanged edit or write.
+Do not output analysis, planning, explanations, code fences, or prose outside tool arguments. Immediately use `edit` for exact, localized replacements. Use `write` only when the necessary correction cannot be expressed safely as a small edit. Make all necessary edits to the smallest responsible permitted files, one edit or write per response, and keep any complete rewritten file below 11,500 characters. Never repeat an unchanged edit or write.
+
+As soon as the supplied failures are addressed, call `finish_repair` with a short summary, preferably as the only tool in the final response. This explicitly returns control to fresh deterministic tests and build checks. Successful writes do not provide new verification feedback: do not keep rewriting or polishing based on guesses about later failures. If a tool reports that your replacement makes no change, or you cannot justify another edit from the supplied evidence, call `finish_repair` and let verification establish the next diagnosis. The handoff does not claim that tests pass.
 
 The runner enforces a per-attempt path allowlist. Build failures take precedence over test failures: when the repair stage is `build`, fix only the listed compiler errors and do not rewrite UI code or tests outside the permitted paths. Use only the exact materialized interface exports supplied below; never invent or rename a system interface.
 

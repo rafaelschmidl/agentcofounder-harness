@@ -447,6 +447,9 @@ async function main(): Promise<void> {
         remainingTime(),
         repairEnvironment,
         remainingCalls,
+        Number.POSITIVE_INFINITY,
+        [],
+        ["finish_repair"],
       );
       stageEventFiles.push(repairEvents);
       customizationExitCode = repair.exitCode;
@@ -461,7 +464,8 @@ async function main(): Promise<void> {
           attempt: repairAttempt,
           diagnosis_key: diagnosis.key,
           exit_code: repair.exitCode,
-          successful_owned_writes: repair.successfulToolCalls,
+          successful_tool_calls: repair.successfulToolCalls,
+          completion_tool: repair.completionTool,
         },
       );
       await linkBuildPlan(plan, spec, outputDirectory);

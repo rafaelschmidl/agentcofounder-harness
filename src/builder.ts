@@ -102,10 +102,11 @@ export function buildRepairPiArguments(
     .join("\n");
   return [
     "--mode", "json", "--print", "--offline", "--no-extensions", "--no-skills",
-    "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", "write,edit",
+    "--no-prompt-templates", "--no-themes", "--no-context-files", "--tools", "write,edit,finish_repair",
     "--system-prompt", `${systemPrompt.trim()}\n\n${appContext.trim()}`,
     "--session-dir", path.join(artifactDirectory, "sessions"),
     "--extension", path.join(REPOSITORY_ROOT, "solution", "extensions", "owned-paths.ts"),
+    "--extension", path.join(REPOSITORY_ROOT, "solution", "extensions", "repair-completion.ts"),
     ...providerPiArguments(provider.provider, provider.model),
     "--thinking", builderThinkingFromEnvironment(),
     [
@@ -115,7 +116,7 @@ export function buildRepairPiArguments(
       requirements,
       "Deterministically permitted paths:",
       permittedPaths.map((candidate) => `- ${candidate}`).join("\n"),
-      "Address only the supplied failure evidence, then stop.",
+      "Address only the supplied failure evidence, then call finish_repair to obtain fresh deterministic verification. Do not continue speculative edits after that evidence is addressed.",
     ].join("\n"),
   ];
 }

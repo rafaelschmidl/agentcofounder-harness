@@ -16,6 +16,7 @@ export interface CommandResult {
   toolLimitReached: boolean;
   completedFiles: string[];
   requiredFilesComplete: boolean;
+  completionTool?: string;
 }
 
 export interface EventSummary {
@@ -128,6 +129,35 @@ export class PiFileCompletion {
   }
 }
 
+/** Explicit handoffs stop after the current tool batch, independently of how many edits were needed. */
+export class PiToolHandoff {
+  private readonly pending = new Map<string, string>();
+  private pendingResponseTools = 0;
+  completionTool: string | undefined;
+
+  constructor(private readonly toolNames: readonly string[] = []) {}
+
+  get complete(): boolean {
+    return this.completionTool !== undefined && this.pendingResponseTools === 0;
+  }
+
+  observe(summary: EventSummary): boolean {
+    if (summary.assistantCall) this.pendingResponseTools = summary.toolCalls;
+    if (summary.toolExecutionStarted && summary.toolCallId && summary.toolName && this.toolNames.includes(summary.toolName)) {
+      this.pending.set(summary.toolCallId, summary.toolName);
+    }
+    if (summary.toolExecutionEnded) {
+      if (summary.toolCallId) {
+        const tool = this.pending.get(summary.toolCallId);
+        this.pending.delete(summary.toolCallId);
+        if (tool && summary.toolExecutionSucceeded) this.completionTool = tool;
+      }
+      if (this.pendingResponseTools > 0) this.pendingResponseTools -= 1;
+    }
+    return this.complete;
+  }
+}
+
 export class PiResponseBudget {
   readonly maxModelCalls: number;
   modelCalls = 0;
@@ -167,10 +197,12 @@ export async function runPi(
   maxModelCalls = Number.POSITIVE_INFINITY,
   maxSuccessfulTools = Number.POSITIVE_INFINITY,
   requiredPaths: readonly string[] = [],
+  completionTools: readonly string[] = [],
 ): Promise<CommandResult> {
   const budget = new PiResponseBudget(maxModelCalls);
   const toolBudget = new PiToolBudget(maxSuccessfulTools);
   const completion = new PiFileCompletion(cwd, requiredPaths);
+  const handoff = new PiToolHandoff(completionTools);
   const events = createWriteStream(eventFile, { flags: "wx" });
   const errors = createWriteStream(stderrFile, { flags: "wx" });
   let lineBuffer = "";
@@ -206,7 +238,8 @@ export async function runPi(
         const responseStop = budget.observe(summary);
         const toolStop = toolBudget.observe(summary);
         const filesComplete = completion.observe(summary);
-        if (responseStop || toolStop || filesComplete) signalProcessTree(child, "SIGTERM");
+        const handedOff = handoff.observe(summary);
+        if (responseStop || toolStop || filesComplete || handedOff) signalProcessTree(child, "SIGTERM");
       };
 
       child.stdout.on("data", (chunk: Buffer) => {
@@ -229,7 +262,7 @@ export async function runPi(
         if (lineBuffer !== "") processEventLine(lineBuffer);
         const exitCode = timedOut
           ? 124
-          : toolBudget.limitReached || completion.complete
+          : toolBudget.limitReached || completion.complete || handoff.complete
             ? 0
             : budget.unsafeIncompleteStop
             ? 1
@@ -245,6 +278,7 @@ export async function runPi(
           toolLimitReached: toolBudget.limitReached,
           completedFiles: completion.completedFiles,
           requiredFilesComplete: completion.complete,
+          ...(handoff.completionTool ? { completionTool: handoff.completionTool } : {}),
         });
       });
     });

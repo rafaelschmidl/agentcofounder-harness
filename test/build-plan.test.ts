@@ -333,7 +333,7 @@ describe("deterministic BuildPlan compiler", () => {
     expect(prompts.appContext).toContain("export const broken = true");
     expect(prompts.appContext).not.toContain("export const unrelated = true");
     expect(prompts.appContext).toContain("error TS9999");
-    expect(args[args.indexOf("--tools") + 1]).toBe("write,edit");
+    expect(args[args.indexOf("--tools") + 1]).toBe("write,edit,finish_repair");
     expect(args.at(-1)).toContain("Repair attempt 1");
     expect(args.at(-1)).toContain("src/product/domain.ts");
     expect(args.at(-1)).not.toContain('"source_fragments"');

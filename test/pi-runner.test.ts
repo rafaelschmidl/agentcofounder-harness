@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PiFileCompletion, PiResponseBudget, PiToolBudget, summarizeEventLine } from "../src/pi-runner.js";
+import { PiFileCompletion, PiResponseBudget, PiToolBudget, PiToolHandoff, summarizeEventLine } from "../src/pi-runner.js";
 
 function assistantEvent(stopReason: string, toolCalls: number): string {
   return JSON.stringify({
@@ -113,5 +113,38 @@ describe("required product file completion", () => {
     completion.observe(summarizeEventLine(JSON.stringify({ type: "tool_execution_start", toolName: "write", toolCallId: "other", args: { path: "/other/src/product/App.tsx" } })));
     expect(completion.observe(summarizeEventLine(JSON.stringify({ type: "tool_execution_end", toolName: "write", toolCallId: "other", isError: false })))).toBe(false);
     expect(new PiFileCompletion("/app").complete).toBe(false);
+  });
+});
+
+describe("explicit repair handoff", () => {
+  const start = (id: string, toolName: string) => summarizeEventLine(JSON.stringify({ type: "tool_execution_start", toolCallId: id, toolName, args: {} }));
+  const end = (id: string, toolName: string, isError = false) => summarizeEventLine(JSON.stringify({ type: "tool_execution_end", toolCallId: id, toolName, isError }));
+
+  it("allows multiple edits before a successful finish_repair hands control back", () => {
+    const handoff = new PiToolHandoff(["finish_repair"]);
+    for (let index = 0; index < 5; index += 1) {
+      handoff.observe(summarizeEventLine(assistantEvent("toolUse", 1)));
+      handoff.observe(start(`edit-${index}`, "edit"));
+      expect(handoff.observe(end(`edit-${index}`, "edit"))).toBe(false);
+    }
+    handoff.observe(summarizeEventLine(assistantEvent("toolUse", 1)));
+    handoff.observe(start("finish", "finish_repair"));
+    expect(handoff.observe(end("finish", "finish_repair"))).toBe(true);
+    expect(handoff.completionTool).toBe("finish_repair");
+  });
+
+  it("drains a mixed final batch and ignores failed, uncorrelated, or disabled handoffs", () => {
+    const handoff = new PiToolHandoff(["finish_repair"]);
+    expect(handoff.observe(end("unstarted", "finish_repair"))).toBe(false);
+    handoff.observe(start("failed", "finish_repair"));
+    expect(handoff.observe(end("failed", "finish_repair", true))).toBe(false);
+    const disabled = new PiToolHandoff();
+    disabled.observe(start("disabled", "finish_repair"));
+    expect(disabled.observe(end("disabled", "finish_repair"))).toBe(false);
+    handoff.observe(summarizeEventLine(assistantEvent("toolUse", 2)));
+    handoff.observe(start("finish", "finish_repair"));
+    expect(handoff.observe(end("finish", "finish_repair"))).toBe(false);
+    handoff.observe(start("last-edit", "edit"));
+    expect(handoff.observe(end("last-edit", "edit"))).toBe(true);
   });
 });
