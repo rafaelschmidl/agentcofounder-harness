@@ -60,7 +60,7 @@ function semanticErrors(plan: BuildPlan, spec: ProductSpec): string[] {
   }
 
   for (const planned of plan.blocks) {
-    if (planned.id === "domain.executable-collection") {
+    if (planned.id === "domain.executable-collection" || planned.id === "verification.collection-ui") {
       try {
         if (contentHash(planned.config.contract) !== contentHash(executableContract(spec))) errors.push("compiled collection contract differs from the validated ProductSpec");
       } catch (error) { errors.push(String(error)); }

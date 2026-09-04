@@ -1,0 +1,96 @@
+// Compiler-owned contract checks. These do not claim prose journey or raw-idea fidelity.
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { expect, it, vi } from 'vitest';
+import App from './App';
+import { matchesGuard, type FlatCollectionContract, type FieldRule, type CollectionValues } from '../system/executable-collection';
+
+const contract: FlatCollectionContract = __COMPILED_CONTRACT__;
+const scenarios: { initial: CollectionValues; paths: { action: string; steps: { action: string; input: CollectionValues; expected: CollectionValues }[] }[] } = __COMPILED_SCENARIOS__;
+function control(selector: string, parent: ParentNode = document.body): HTMLElement {
+  const matches = [...parent.querySelectorAll<HTMLElement>(selector)];
+  expect(matches, 'one unambiguous bound UI control').toHaveLength(1);
+  const element = matches[0];
+  expect(element).toBeVisible(); expect(element).toBeEnabled(); expect(element).toHaveAccessibleName();
+  return element;
+}
+function record(): HTMLElement {
+  const records = document.querySelectorAll<HTMLElement>('[data-collection-record]');
+  expect(records).toHaveLength(1);
+  expect(records[0]).toBeVisible(); return records[0];
+}
+function show(expected: CollectionValues) {
+  const row = record();
+  for (const key of [...contract.fields.map(field => field.key), ...Object.keys(contract.hidden ?? {})]) {
+    const value = expected[key] ?? '';
+    const label = contract.fields.find(field => field.key === key)?.options?.find(option => option.value === value)?.label
+      ?? (value ? value.replace(/_/g, ' ') : '—');
+    const field = row.querySelector<HTMLElement>('[data-collection-field="' + CSS.escape(key) + '"]');
+    expect(field, 'visible value for ' + key).not.toBeNull();
+    expect(field).toBeVisible(); expect(field!.textContent?.trim()).toBe(label);
+  }
+  for (const action of contract.actions) {
+    const available = matchesGuard(action.when, expected) && (!action.source || matchesGuard(action.source, expected));
+    const selector = '[data-collection-action="' + CSS.escape(action.id) + '"]';
+    if (available) control(selector, row);
+    else for (const node of row.querySelectorAll<HTMLElement>(selector)) expect(node).toBeDisabled();
+  }
+}
+async function fill(user: ReturnType<typeof userEvent.setup>, fields: FieldRule[], values: CollectionValues) {
+  const form = screen.getByRole('form'); expect(form).toBeVisible();
+  for (const field of fields) {
+    const input = within(form).getByLabelText(field.label, { exact: true });
+    expect(input).toBeVisible();
+    if (field.options) await user.selectOptions(input, values[field.key]);
+    else { await user.clear(input); if (values[field.key]) await user.type(input, values[field.key]); }
+  }
+}
+async function submit(user: ReturnType<typeof userEvent.setup>) {
+  const form = screen.getByRole('form');
+  await user.click(control('button[type="submit"]', form));
+}
+async function create(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(control('[data-collection-control="create"]'));
+  await fill(user, contract.fields, scenarios.initial); await submit(user); show(scenarios.initial);
+}
+function reload(view: ReturnType<typeof render>) { view.unmount(); return render(<App />); }
+
+it('compiled-contract: visible create, editable fields, delete and reload', async () => {
+  const user = userEvent.setup(); let view = render(<App />); await create(user);
+  view = reload(view); show(scenarios.initial);
+  await user.click(control('[data-collection-control="edit"]', record()));
+  const edited = { ...scenarios.initial };
+  for (const field of contract.fields) edited[field.key] = field.options?.[0]?.value ?? ('Revised ' + field.label);
+  await fill(user, contract.fields, edited); await submit(user); show(edited);
+  view = reload(view); show(edited);
+  await user.click(control('[data-collection-control="remove"]', record()));
+  expect(document.querySelector('[data-collection-record]')).toBeNull();
+  view = reload(view); expect(document.querySelector('[data-collection-record]')).toBeNull();
+});
+
+for (const path of scenarios.paths) it('compiled-contract: canonical transition ' + path.action + ' persists', async () => {
+  const user = userEvent.setup(); let view = render(<App />); await create(user);
+  for (const step of path.steps) {
+    const action = contract.actions.find(action => action.id === step.action)!;
+    await user.click(control('[data-collection-action="' + CSS.escape(step.action) + '"]', record()));
+    if (action.input?.length) { await fill(user, action.input, step.input); await submit(user); }
+    show(step.expected); view = reload(view); show(step.expected);
+  }
+});
+
+for (const required of contract.fields.filter(field => field.required && !field.options)) it('compiled-contract: required ' + required.key + ' rejects an empty create', async () => {
+  const user = userEvent.setup(); render(<App />);
+  await user.click(control('[data-collection-control="create"]'));
+  await fill(user, contract.fields, { ...scenarios.initial, [required.key]: '' }); await submit(user);
+  expect(screen.getByRole('form')).toBeVisible();
+  expect(document.querySelector('[data-collection-record]')).toBeNull();
+  expect(screen.getByLabelText(required.label, { exact: true })).toHaveAttribute('aria-invalid', 'true');
+});
+
+it('compiled-contract: failed persistence preserves visible and reloaded record', async () => {
+  const user = userEvent.setup(); let view = render(<App />); await create(user);
+  const save = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+  await user.click(control('[data-collection-control="remove"]', record()));
+  show(scenarios.initial); expect(screen.getByRole('alert')).toBeVisible();
+  save.mockRestore(); view = reload(view); show(scenarios.initial);
+});

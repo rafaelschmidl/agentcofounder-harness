@@ -1,0 +1,17 @@
+// Semantic bindings only. The product owns elements, composition, names and CSS.
+import type { CollectionController, CollectionDefinition, CollectionItem } from './collection-controller';
+export function collectionUi(controller: CollectionController) {
+  return {
+    create: () => ({ 'data-collection-control': 'create', onClick: controller.startCreate }),
+    record: (record: CollectionItem) => ({ 'data-collection-record': record.id }),
+    field: (key: string) => ({ 'data-collection-field': key }),
+    edit: (record: CollectionItem) => ({ 'data-collection-control': 'edit', onClick: () => controller.startEdit(record) }),
+    remove: (record: CollectionItem) => ({ 'data-collection-control': 'remove', onClick: () => controller.remove(record) }),
+    action: (record: CollectionItem, id: string) => ({ 'data-collection-action': id, onClick: () => controller.act(record, id) }),
+  };
+}
+export function collectionValue(definition: CollectionDefinition, record: CollectionItem, key: string): string {
+  const value = record[key] ?? '';
+  return definition.fields.find(field => field.key === key)?.options?.find(option => option.value === value)?.label
+    ?? (value ? value.replace(/_/g, ' ') : '—');
+}

@@ -14,6 +14,7 @@ const BLOCK_ORDER = [
   "ui.accessible-shell",
   "ui.collection-controller",
   "domain.executable-collection",
+  "verification.collection-ui",
   "verification.product",
 ] as const;
 
@@ -37,7 +38,7 @@ const LINKER_FILES = [
   "src/styles.css",
 ];
 
-function selectedBlockIds(spec: ProductSpec, executableCollection = false): Set<string> {
+function selectedBlockIds(spec: ProductSpec, executableCollection = false, compiledUiJourneys = false): Set<string> {
   const selected = new Set<string>(["app.foundation", "ui.accessible-shell", "verification.product"]);
   if (spec.persistence.mode === "LOCAL") selected.add("data.local-repository");
   if (spec.entities.length > 0 || spec.selected_patterns.includes("crud.collection@1.0.0")) {
@@ -65,6 +66,10 @@ function selectedBlockIds(spec: ProductSpec, executableCollection = false): Set<
     selected.add("ui.collection-controller");
   }
   if (executableCollection && spec.collection_execution?.mode === "compiled") selected.add("domain.executable-collection");
+  if (compiledUiJourneys) {
+    if (!selected.has("domain.executable-collection")) throw new Error("Compiled UI journeys require an explicitly enabled compiled collection");
+    selected.add("verification.collection-ui");
+  }
 
   const addDependencies = (blockId: string, visiting = new Set<string>()): void => {
     if (visiting.has(blockId)) throw new Error(`Capability dependency cycle at ${blockId}`);
@@ -84,6 +89,7 @@ function selectedBlockIds(spec: ProductSpec, executableCollection = false): Set<
 function blockConfig(blockId: string, spec: ProductSpec): Record<string, unknown> {
   switch (blockId) {
     case "domain.executable-collection":
+    case "verification.collection-ui":
       return { contract: executableContract(spec) };
     case "app.foundation":
       return { product_name: spec.product.experience?.name ?? spec.product.summary, product_summary: spec.product.summary };
@@ -136,9 +142,10 @@ function plannedBlocks(spec: ProductSpec, selected: Set<string>): PlannedBlock[]
   });
 }
 
-export function compileProductSpec(spec: ProductSpec, options: { executableCollection?: boolean } = {}): BuildPlan {
-  const selected = selectedBlockIds(spec, options.executableCollection);
-  const agentFiles = selected.has("domain.executable-collection") ? AGENT_FILES.filter((file) => file !== "src/product/domain.ts") : AGENT_FILES;
+export function compileProductSpec(spec: ProductSpec, options: { executableCollection?: boolean; compiledUiJourneys?: boolean } = {}): BuildPlan {
+  const selected = selectedBlockIds(spec, options.executableCollection, options.compiledUiJourneys);
+  const agentFiles = AGENT_FILES.filter((file) => !(selected.has("domain.executable-collection") && file === "src/product/domain.ts")
+    && !(selected.has("verification.collection-ui") && file === "src/product/product.test.tsx"));
   const blocks = plannedBlocks(spec, selected);
   const implementedRequirements = spec.requirements.filter((requirement) => requirement.disposition === "IMPLEMENT");
   const customSlotId = "custom_product";
@@ -167,7 +174,9 @@ export function compileProductSpec(spec: ProductSpec, options: { executableColle
     custom_slots: [
       {
         id: customSlotId,
-        purpose: selected.has("domain.executable-collection")
+        purpose: selected.has("verification.collection-ui")
+          ? "Implement free product-specific JSX composition and CSS using collectionUi bindings. Compiler-owned tests verify contract behavior; prose acceptance journeys remain independently assessed."
+          : selected.has("domain.executable-collection")
           ? "Implement product-specific interface composition, visual identity, and independent journey tests using the compiled domain."
           : "Implement product-specific domain composition, interface language, visual design, and journey tests.",
         requirement_ids: implementedRequirements.map((requirement) => requirement.id),
