@@ -1,0 +1,32 @@
+{
+  "id": "website.design.dark-accent@1.0.0",
+  "title": "Dark-accent visual direction",
+  "summary": "One saturated signature accent doing all the identity work against a near-black canvas, for apps that read as dark, moody, or nocturnal.",
+  "signals": ["dark", "dark mode", "night mode", "moody", "neon", "glow", "midnight", "nightlife"],
+  "capabilities": ["near-black canvas", "single saturated accent", "dark-mode palette"],
+  "defaults": [
+    "Hue: one saturated signature accent (Spotify green #1DB954 in the reference) reserved for primary actions, active states, and identity marks",
+    "Surface: near-black canvas (#121212 range) with slightly raised dark surfaces and near-white body text (#EAEAEA range)",
+    "Density: relaxed consumer spacing with generous media-first blocks",
+    "Keep the accent off large backgrounds: it marks one primary button, highlights, and state only"
+  ],
+  "risks": [
+    "Accent bleeding across large surfaces and losing its identity role",
+    "Low-contrast gray-on-dark body text failing 4.5:1",
+    "A second hue competing with the signature accent on the dark canvas"
+  ],
+  "verification": [
+    "One brand accent hue supports primary actions and highlights; preserve meaningful status/data colors",
+    "Body text reaches 4.5:1 contrast on the near-black surface",
+    "Brand neutrals avoid pure #000000 or #FFFFFF unless the user explicitly requests them"
+  ],
+  "example_startups": [
+    { "name": "Spotify", "note": "Single signature green carrying all identity against a near-black canvas" }
+  ],
+  "visual_rules": [
+    "For brand decoration, prefer one signature accent used sparingly for identity and primary actions",
+    "Use a cohesive neutral palette; family tones are suggestions, not limits on explicit user design choices",
+    "Keep ordinary text, including button labels, at least 4.5:1 contrast and controls/focus states visible",
+    "Keep decorative hues restrained; retain colors needed for status, data distinctions, or explicit user requirements"
+  ]
+}

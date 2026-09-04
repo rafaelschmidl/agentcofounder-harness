@@ -148,6 +148,98 @@ describe("offline pattern catalogue", () => {
     expect(result.selected.length).toBeLessThanOrEqual(4);
   });
 
+  it("keeps design family cards complete and shaped", () => {
+    const cards = loadPatternCatalog();
+    const designCards = cards.filter((card) => card.id.startsWith("website.design."));
+    expect(designCards.length).toBeGreaterThanOrEqual(4);
+    for (const card of designCards) {
+      expect(card.signals.length).toBeGreaterThan(0);
+      expect(card.signals.length).toBeLessThanOrEqual(15);
+      expect(card.defaults?.length).toBeGreaterThan(0);
+      expect(card.example_startups?.length).toBeGreaterThanOrEqual(1);
+      expect(card.example_startups).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: expect.any(String), note: expect.any(String) })]),
+      );
+      expect(card.visual_rules?.length).toBeGreaterThanOrEqual(4);
+    }
+    const ruleTexts = new Set(designCards.map((card) => JSON.stringify(card.visual_rules)));
+    expect(ruleTexts.size).toBe(1);
+    const signalWords = new Set(designCards.flatMap((card) => card.signals).flatMap((signal) => signal.split(" ")));
+    for (const categoryWord of ["shop", "store", "marketplace", "booking", "saas", "crm", "commerce"]) {
+      expect(signalWords.has(categoryWord)).toBe(false);
+    }
+  });
+
+  it("returns at most one design family card when an idea matches several", () => {
+    const selectedIds = retrievePatterns("a dark moody minimal clean habit tracker vibe", 6).selected.map(
+      (result) => result.card.id,
+    );
+    const designIds = selectedIds.filter((id) => id.startsWith("website.design."));
+    expect(designIds.length).toBe(1);
+  });
+
+  it.each([
+    "Manage delivery routes with transport mode and shift mode choices",
+    "mode night", "nightly models",
+    "One app for my family to see what they own and where they put things",
+    "Take borrowed books off the shelf and note who has each one",
+    "Scientific chart comparing four color-coded conditions and their result distributions",
+  ])("does not choose a design family from phrase fragments or card prose alone: %s", (query) => {
+    expect(retrievePatterns(query, 8).selected.filter(({ card }) => card.id.startsWith("website.design."))).toEqual([]);
+  });
+
+  it.each([
+    ["DARK-mode and moody", "dark-accent", ["dark", "dark mode", "moody"]],
+    ["warm editorial", "warm-editorial", ["warm", "editorial"]],
+    ["bold playful", "bold-consumer", ["bold", "playful"]],
+    ["calm clinical", "calm-clinical", ["clinical", "calm"]],
+    ["restrained utilitarian", "restrained-functional", ["utilitarian", "restrained"]],
+  ])("keeps authored design directions retrievable with complete signal evidence: %s", (query, family, signals) => {
+    const design = retrievePatterns(query as string, 8).selected.find(({ card }) => card.id.startsWith("website.design."));
+    expect(design?.card.id).toBe(`website.design.${family}@1.0.0`);
+    expect(design?.matched_signals).toEqual(signals);
+  });
+
+  it("credits a complete design phrase but not unrelated mode tokens or separated phrase order", () => {
+    const complete = retrievePatterns("NIGHT-mode for a practice tracker", 8).selected.find(({ card }) => card.id.startsWith("website.design."));
+    expect(complete?.card.id).toBe("website.design.dark-accent@1.0.0");
+    expect(complete?.matched_signals).toEqual(["night mode"]);
+    const standalone = retrievePatterns("dark", 8).selected.find(({ card }) => card.id.startsWith("website.design."));
+    expect(standalone?.matched_signals).toEqual(["dark"]);
+    expect(standalone?.score).toBe(5); // No extra signal credit from absent "dark mode".
+  });
+
+  it("distinguishes incidental prose terms from authored signals without changing strategy ranking", () => {
+    const selected = retrievePatterns("One app for my family to see what they own and where they put things", 8).selected;
+    const prose = selected.find(({ card }) => card.id === "website.strategy.consumer-app@1.0.0");
+    expect(prose).toMatchObject({ score: 2, matched_terms: ["app"], matched_signals: [] });
+    const phrase = retrievePatterns("book a DEMO", 8).selected.find(({ card }) => card.id === "website.strategy.saas-demo@1.0.0");
+    expect(phrase?.matched_signals).toEqual(expect.arrayContaining(["demo", "book a demo"]));
+  });
+
+  it("keeps the strategy card in top-N alongside at most one design family", () => {
+    const selectedIds = retrievePatterns(
+      "a warm cozy online storefront selling handmade goods with a product catalogue and cart checkout",
+      6,
+    ).selected.map((result) => result.card.id);
+    expect(selectedIds).toContain("website.strategy.commerce@1.0.0");
+    expect(selectedIds.filter((id) => id.startsWith("website.design.")).length).toBeLessThanOrEqual(1);
+  });
+
+  it("returns no website cards for unrelated ideas", () => {
+    const selectedIds = retrievePatterns("recipe meal planner with weekly grocery lists", 8).selected.map(
+      (result) => result.card.id,
+    );
+    expect(selectedIds.filter((id) => id.startsWith("website."))).toEqual([]);
+  });
+
+  it("returns the expected strategy card for a strong-match idea", () => {
+    const selectedIds = retrievePatterns("online storefront selling handmade goods with a product catalogue and cart checkout", 6).selected.map(
+      (result) => result.card.id,
+    );
+    expect(selectedIds).toContain("website.strategy.commerce@1.0.0");
+  });
+
   it("records retrieved cards as runner-readable JSONL evidence", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "pattern-audit-"));
     try {

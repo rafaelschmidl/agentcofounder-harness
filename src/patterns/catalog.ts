@@ -13,6 +13,7 @@ export interface ExampleStartup {
 }
 
 const WEBSITE_STRATEGY_PREFIX = "website.strategy.";
+const WEBSITE_DESIGN_PREFIX = "website.design.";
 
 function nonEmptyStrings(value: unknown, file: string, field: string): void {
   if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== "string" || !item.trim())) {
@@ -33,6 +34,7 @@ export interface PatternCard {
   typical_views?: WebsiteStrategyView[];
   common_components?: string[];
   example_startups?: ExampleStartup[];
+  visual_rules?: string[];
 }
 
 interface PatternIndex {
@@ -46,6 +48,8 @@ export interface PatternRetrievalResult {
     card: PatternCard;
     score: number;
     matched_terms: string[];
+    /** Complete authored signal phrases, distinct from incidental card prose. */
+    matched_signals: string[];
   }>;
 }
 
@@ -99,6 +103,15 @@ function assertCard(card: PatternCard, file: string): void {
       throw new Error(`Website strategy card needs at least two example startups: ${file}`);
     }
   }
+  if (card.id.startsWith(WEBSITE_DESIGN_PREFIX)) {
+    if (card.visual_rules === undefined) {
+      throw new Error(`Website design card missing shared visual rules: ${file}`);
+    }
+    nonEmptyStrings(card.visual_rules, file, "visual_rules");
+    if (card.example_startups === undefined || card.example_startups.length < 1) {
+      throw new Error(`Website design card needs at least one named reference startup: ${file}`);
+    }
+  }
 }
 
 export function loadPatternCatalog(): PatternCard[] {
@@ -149,13 +162,14 @@ export function retrievePatterns(query: string, limit = 4): PatternRetrievalResu
   const queryTerms = terms(query);
   const queryPhrase = phrase(query);
   for (const stopword of QUERY_STOPWORDS) queryTerms.delete(stopword);
-  const selected = loadPatternCatalog()
+  const ranked = loadPatternCatalog()
     .map((card) => {
-      // Website vocabulary includes phrases such as "book a demo" and "return policy".
+      // Website vocabulary includes phrases such as "book a demo" and "night mode".
       // Credit their signal only when the whole ordered phrase occurs, not each
       // isolated word. Preserve the existing mechanical-card scoring contract.
-      const signals = card.id.startsWith(WEBSITE_STRATEGY_PREFIX)
-        ? card.signals.filter((signal) => queryPhrase.includes(phrase(signal)))
+      const matchedSignals = card.signals.filter((signal) => queryPhrase.includes(phrase(signal)));
+      const signals = card.id.startsWith(WEBSITE_STRATEGY_PREFIX) || card.id.startsWith(WEBSITE_DESIGN_PREFIX)
+        ? matchedSignals
         : card.signals;
       const weightedTerms = [
         ...signals.flatMap((signal) => [...terms(signal), ...terms(signal)]),
@@ -165,13 +179,25 @@ export function retrievePatterns(query: string, limit = 4): PatternRetrievalResu
       ];
       const matchedTerms = [...new Set(weightedTerms.filter((term) => queryTerms.has(term)))].sort();
       const score = weightedTerms.reduce((total, term) => total + (queryTerms.has(term) ? 1 : 0), 0);
-      return { card, score, matched_terms: matchedTerms };
+      return { card, score, matched_terms: matchedTerms, matched_signals: matchedSignals };
     })
-    .filter((result) => result.score > 0)
-    .sort((left, right) => right.score - left.score || left.card.id.localeCompare(right.card.id))
-    .slice(0, limit);
+    .filter((result) => result.score > 0 && (!result.card.id.startsWith(WEBSITE_DESIGN_PREFIX) || result.matched_signals.length > 0))
+    .sort((left, right) => right.score - left.score || left.card.id.localeCompare(right.card.id));
 
-  return { query, selected };
+  // At most one design family per result set (highest score): vibe-rich ideas
+  // must not spend multiple top-N slots on cosmetic cards. This cap does not
+  // claim that one family cannot displace another result at the retrieval limit.
+  const selected: typeof ranked = [];
+  let designFamilySelected = false;
+  for (const result of ranked) {
+    if (result.card.id.startsWith(WEBSITE_DESIGN_PREFIX)) {
+      if (designFamilySelected) continue;
+      designFamilySelected = true;
+    }
+    selected.push(result);
+  }
+
+  return { query, selected: selected.slice(0, limit) };
 }
 
 export function hasPattern(patternId: string): boolean {

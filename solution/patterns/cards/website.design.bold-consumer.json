@@ -1,0 +1,32 @@
+{
+  "id": "website.design.bold-consumer@1.0.0",
+  "title": "Bold consumer visual direction",
+  "summary": "A single hero brand hue paired with inky black and off-white, carrying a punchy, playful, energetic consumer identity without competing colors.",
+  "signals": ["bold", "playful", "fun", "vibrant", "colorful", "energetic", "punchy", "friendly", "cheerful"],
+  "capabilities": ["single hero hue", "off-white background", "tactile consumer buttons"],
+  "defaults": [
+    "Hue: one hero brand hue (Klarna pink #FFB3C7 in the reference) dominating identity, always paired with inky black text",
+    "Surface: warm off-white background; the hero hue may own large identity areas but never body text or gradients",
+    "Density: compact consumer density with big tactile buttons and clear primary paths",
+    "Keep the hero color off large-body typography and multi-hue combinations"
+  ],
+  "risks": [
+    "A second saturated hue diluting the hero color",
+    "Hero-hue text on the light surface (or inverse) failing contrast floors",
+    "Accent overuse turning playful visual energy into noise"
+  ],
+  "verification": [
+    "One hero hue carries brand identity and no second decorative saturated hue competes",
+    "Ordinary button labels and body text reach 4.5:1 contrast",
+    "Brand neutrals avoid pure #000000 and #FFFFFF unless explicitly requested"
+  ],
+  "example_startups": [
+    { "name": "Klarna", "note": "One signature pink (#FFB3C7) as the sole color, always with inky black and off-white, never on body text" }
+  ],
+  "visual_rules": [
+    "For brand decoration, prefer one signature accent used sparingly for identity and primary actions",
+    "Use a cohesive neutral palette; family tones are suggestions, not limits on explicit user design choices",
+    "Keep ordinary text, including button labels, at least 4.5:1 contrast and controls/focus states visible",
+    "Keep decorative hues restrained; retain colors needed for status, data distinctions, or explicit user requirements"
+  ]
+}

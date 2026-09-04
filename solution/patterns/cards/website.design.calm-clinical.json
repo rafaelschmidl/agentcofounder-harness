@@ -1,0 +1,32 @@
+{
+  "id": "website.design.calm-clinical@1.0.0",
+  "title": "Calm clinical visual direction",
+  "summary": "A clean, precise clinical monochrome softened by sparse warm secondary tones — calm, airy, and trustworthy rather than sterile or dashboard-like.",
+  "signals": ["clinical", "calm", "clean", "minimal", "precise", "serene", "airy", "quiet", "hygienic"],
+  "capabilities": ["clinical monochrome", "warm secondary tones", "spacious hierarchy"],
+  "defaults": [
+    "Hue: clinical monochrome base softened by at most two warm secondary tones (soft yellow, beige, brown, or moss green) used sparingly",
+    "Surface: bright white-adjacent monochrome surface (#FAFAF7 range), never pure white",
+    "Density: spacious scanning rhythm — generous gaps, unhurried hierarchy, clear breathing room",
+    "Let the warm secondaries signpost sections and supporting states; the primary action stays monochrome-backed"
+  ],
+  "risks": [
+    "Cold gray-on-white body text failing 4.5:1",
+    "Secondary tones multiplying into three or more competing hues",
+    "Sterility where the direction calls for warm, calm trust"
+  ],
+  "verification": [
+    "At most two decorative warm tones accompany the monochrome brand base; retain needed status/data distinctions",
+    "Body text reaches 4.5:1 contrast on the clinical surface",
+    "Brand neutrals avoid pure #000000/#FFFFFF and competing saturated decoration, subject to explicit user choices"
+  ],
+  "example_startups": [
+    { "name": "Neko Health", "note": "Warm optimistic secondaries (yellow, beige, brown, green) softening clinical monochrome into trust and calm" }
+  ],
+  "visual_rules": [
+    "For brand decoration, prefer one signature accent used sparingly for identity and primary actions",
+    "Use a cohesive neutral palette; family tones are suggestions, not limits on explicit user design choices",
+    "Keep ordinary text, including button labels, at least 4.5:1 contrast and controls/focus states visible",
+    "Keep decorative hues restrained; retain colors needed for status, data distinctions, or explicit user requirements"
+  ]
+}

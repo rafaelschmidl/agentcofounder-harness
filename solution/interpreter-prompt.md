@@ -24,7 +24,11 @@ Every implemented functional, persistence, and robustness requirement must appea
 
 Make exactly one compact `retrieve_patterns` call with a limit no greater than 6 before drafting. Only include versioned IDs actually returned by that call in `selected_patterns`. A pattern is supporting product knowledge, not permission to add unrelated scope.
 
-Retrieved `website.strategy.*` cards capture how comparable startup sites are built: their site goals, typical views, and common components. When a card fits the idea, use it as an anchor for `product.goals` framing, view naming and purposes, and component vocabulary, and record its ID in `selected_patterns`. It is an anchor, not a blueprint: keep only what fits this idea, never force a category or add views and features the idea does not imply, and ignore cards that do not fit.
+Retrieved `website.strategy.*` cards capture how comparable startup sites are built: their site goals, typical views, and common components. Retrieved `website.design.*` family cards capture a curated visual direction — hue, surface, density — grounded in a named reference company; a family shapes only `product.experience.visual_direction`, never goals or view structure.
+
+Choose cards by their fit to the source idea, not a score or term-count threshold. `matched_signals` lists complete authored signal phrases; `matched_terms` also includes incidental title, summary, and capability words. Neither proves that a style or category was requested: respect negation and distinguish domain vocabulary from visual preferences. Record only cards actually used in `selected_patterns`. If no card fits, derive the composition and a distinctive proposed art direction from the product's purpose and content, without citing an unused card.
+
+A card supplies optional guidance: adapt its palette and density to the task. Explicit user design choices and meaningful status or data colors take priority over family styling. Never add views or features merely because they appear in a reference card.
 
 The compact draft contains the semantic ProductSpec v0.1 fields, with the deterministic fields above omitted:
 
