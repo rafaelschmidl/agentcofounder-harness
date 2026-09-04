@@ -108,6 +108,16 @@ describe("offline pattern catalogue", () => {
     expect(result?.matched_terms).not.toContain("book");
   });
 
+  it("does not rank marketplace vocabulary above ordinary collection browsing and filtering", () => {
+    const selected = retrievePatterns("Browse and filter my saved recipes by ingredient", 8).selected;
+    expect(selected[0]?.card.id).toBe("crud.collection@1.0.0");
+    expect(selected.map(({ card }) => card.id)).not.toContain("website.strategy.marketplace@1.0.0");
+    // Other low-score prose matches are intentionally outside this precision fix.
+    const marketplace = retrievePatterns("Browse listings in a marketplace and filter listings by rental type", 8).selected;
+    expect(marketplace[0]?.card.id).toBe("website.strategy.marketplace@1.0.0");
+    expect(marketplace[0]?.matched_terms).toEqual(expect.arrayContaining(["browse", "filter", "listings", "marketplace"]));
+  });
+
   it("retains the public lending prompt's mechanical cards without new commerce or booking contamination", () => {
     const query = "My family is always borrowing books off my shelves and I never remember who has what. I'd like something simple where I can put in each book, the title, who wrote it, and roughly what kind of book it is, like a novel or a cookbook or a reference thing. When someone borrows one I want to note down their name, and when it comes back I want to clear that off. Mostly I just want to open it up and see everything I own in one list, and be able to pick out just the ones that are currently out with someone. It'd be nice to see how many are lent out right now. If I add a book by mistake I need to be able to fix it or take it off the list. It's just me using it on my own computer.";
     const selected = retrievePatterns(query, 4).selected.map(({ card }) => card.id);
