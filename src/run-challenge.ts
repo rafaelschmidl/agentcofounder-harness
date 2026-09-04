@@ -41,11 +41,11 @@ interface Arguments {
   outputDirectory: string;
   prepareOnly: boolean;
   skipAppInstall: boolean;
+  verificationPort: number;
 }
 
 const SOURCE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(SOURCE_DIRECTORY, "..");
-const APP_PORT = 3000;
 const MAX_PROVIDER_RESPONSES = 32;
 const MAX_PROVIDER_OUTPUT_TOKENS = 8_192;
 
@@ -125,6 +125,7 @@ Options:
   --output-dir <path>     Generated app directory below output/ (default: output/app)
   --prepare-only          Reset the app from the seed without invoking Pi
   --skip-app-install      Do not run npm ci in the generated app
+  --verification-port <n> Development verification port (default: 3000; delivered app contract is unchanged)
   --help                  Show this help
 
 Environment:
@@ -143,6 +144,7 @@ export function parseArguments(argv: string[]): Arguments {
     outputDirectory: path.join("output", "app"),
     prepareOnly: false,
     skipAppInstall: false,
+    verificationPort: 3000,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -157,6 +159,15 @@ export function parseArguments(argv: string[]): Arguments {
     }
     if (argument === "--skip-app-install") {
       parsed.skipAppInstall = true;
+      continue;
+    }
+    if (argument === "--verification-port") {
+      const value = argv[index + 1];
+      if (!value || !/^\d+$/u.test(value) || !Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 65535) {
+        throw new Error("--verification-port requires an integer from 1 to 65535");
+      }
+      parsed.verificationPort = Number(value);
+      index += 1;
       continue;
     }
     if (argument === "--idea-file" || argument === "--output-dir") {
@@ -264,7 +275,7 @@ async function main(): Promise<void> {
   trace = await RunTrace.create(traceFile);
   await trace.record("interpretation", "started", "Started ProductSpec interpretation from the raw idea.");
 
-  const appPortHadListenerBeforePi = await portHasListener(APP_PORT);
+  const appPortHadListenerBeforePi = await portHasListener(args.verificationPort);
   const interpretation = await runProductSpecInterpretation(idea, interpreterDirectory, remainingTime());
   if (interpretation.command.exitCode !== 0 || !interpretation.spec || interpretation.errors.length > 0) {
     await trace.record("interpretation", "failed", "ProductSpec interpretation did not produce a valid specification.", {
@@ -348,6 +359,7 @@ async function main(): Promise<void> {
       await mkdir(verificationDirectory, { recursive: true });
       await trace.record("verification", "started", `Started generated application verification attempt ${attempt}.`);
       verification = await verifyGeneratedApp(outputDirectory, verificationDirectory, {
+        port: args.verificationPort,
         displayRoot: REPOSITORY_ROOT,
         requiredArtifacts,
         journeys: spec.acceptance_journeys,
@@ -474,7 +486,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const portReclamation = await auditAppPortAfterPi(APP_PORT, outputDirectory, appPortHadListenerBeforePi);
+  const portReclamation = await auditAppPortAfterPi(args.verificationPort, outputDirectory, appPortHadListenerBeforePi);
   if (portReclamation.listener_after_pi) {
     const message = `${portReclamation.diagnostic}; pids=${portReclamation.process_ids.join(",") || "none"}`;
     if (portReclamation.reclaimed) console.log(message);

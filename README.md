@@ -77,6 +77,8 @@ The app must be available at `http://localhost:3000`. In another terminal, valid
 npm run validate:result -- output/app/result.json
 ```
 
+Native development can use `--verification-port <port>` to probe an isolated temporary server on a different port. The runner uses that port for its listener audit, verification, and cleanup, and records the actual command in `harness_checks`. The generated app scripts, `app_url`, and delivered `start_command` retain the organizer's port 3000 contract. Leave this option unset for final contract validation.
+
 ## Result and telemetry ownership
 
 The model writes `report.partial.json`, containing the product summary, assumptions, features, and tests. The runner writes `result.json` after parsing Pi's completed `message_end` events. This prevents the model from inventing headline token totals.
