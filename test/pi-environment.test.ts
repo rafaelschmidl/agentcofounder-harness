@@ -18,7 +18,7 @@ describe("isolated Pi environment", () => {
       const models = JSON.parse(
         await readFile(path.join(directory, "pi-state", "models.json"), "utf8"),
       ) as { providers: { berget: { modelOverrides: Record<string, { maxTokens: number }> } } };
-      expect(models.providers.berget.modelOverrides["zai-org/GLM-5.2"]?.maxTokens).toBe(8192);
+      expect(models.providers.berget.modelOverrides["zai-org/GLM-5.2"]?.maxTokens).toBe(32768);
     } finally {
       if (previous === undefined) delete process.env.CHALLENGE_SECRET;
       else process.env.CHALLENGE_SECRET = previous;

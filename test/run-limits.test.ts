@@ -11,15 +11,15 @@ const execute = promisify(execFile);
 afterEach(() => vi.unstubAllEnvs());
 
 describe("configurable response output limit", () => {
-  it("preserves the default and rejects malformed or unsupported limits", () => {
-    expect(runLimitsFromEnvironment({})).toEqual({ max_provider_responses: 32, max_output_tokens_per_response: 8192, max_total_output_tokens: 262144 });
+  it("allows complete response batches by default and rejects malformed or unsupported limits", () => {
+    expect(runLimitsFromEnvironment({})).toEqual({ max_provider_responses: 32, max_output_tokens_per_response: 32768, max_total_output_tokens: 1048576 });
     expect(runLimitsFromEnvironment({ CHALLENGE_MAX_OUTPUT_TOKENS: "1" }).max_output_tokens_per_response).toBe(1);
     for (const value of ["", "0", "-1", "1.5", "NaN", "Infinity", "32769", " 8192", "8e3"]) {
       expect(() => runLimitsFromEnvironment({ CHALLENGE_MAX_OUTPUT_TOKENS: value })).toThrow("CHALLENGE_MAX_OUTPUT_TOKENS");
     }
   });
 
-  it.each([16384, 32768])("reports the same %i cap that Pi receives, without invoking a provider", async (cap) => {
+  it.each([8192, 16384, 32768])("reports the same %i cap that Pi receives, without invoking a provider", async (cap) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "response-limit-"));
     vi.stubEnv("CHALLENGE_MAX_OUTPUT_TOKENS", String(cap));
     vi.stubEnv("CHALLENGE_MODEL", "zai-org/GLM-5.2");

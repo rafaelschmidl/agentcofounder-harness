@@ -145,7 +145,7 @@ Environment:
   CHALLENGE_MODEL         Optional Pi model override
   CHALLENGE_THINKING      Optional Pi thinking level (default: off)
   CHALLENGE_BUILDER_THINKING Optional builder thinking level (default: off)
-  CHALLENGE_MAX_OUTPUT_TOKENS Per-response output cap, including reasoning (default: 8192; maximum: 32768)
+  CHALLENGE_MAX_OUTPUT_TOKENS Per-response output cap, including reasoning (default: 32768; maximum: 32768)
   CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 1800000)
   CHALLENGE_SEMANTIC_REVIEW Set to 1 for an experimental source review after functional checks (default: off)
   CHALLENGE_EXECUTABLE_COLLECTION Set to 1 for experimental compiler-owned collection semantics (default: off)
