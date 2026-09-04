@@ -62,6 +62,7 @@ export async function createPiEnvironment(
     PI_CODING_AGENT_DIR: piState,
     PI_CODING_AGENT_SESSION_DIR: sessions,
     PI_OFFLINE: "1",
+    SYSTEM_V0_PROVIDER_REQUEST_LOG: path.join(stageDirectory, "provider-requests.jsonl"),
   };
   for (const name of PASSTHROUGH) {
     const value = process.env[name];
