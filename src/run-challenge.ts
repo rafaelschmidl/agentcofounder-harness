@@ -63,8 +63,15 @@ export async function diagnoseVerification(
   outputDirectory: string,
   verification: AppVerification,
 ): Promise<RepairDiagnosis> {
-  const diagnosis = await collectRepairDiagnosis(verificationDirectory, outputDirectory);
   const incompleteFiles = verification.incompleteFiles ?? [];
+  // Command outcomes cover CSS/Vite failures and test collection errors that have no TS code or failed assertion.
+  const failed = (pattern: RegExp): boolean => incompleteFiles.length === 0 &&
+    verification.checks.some((check) => pattern.test(check.command) && check.result === "failed");
+  const diagnosis = await collectRepairDiagnosis(verificationDirectory, outputDirectory, {
+    build: failed(/\brun build$/u),
+    tests: failed(/vitest|\bnpm test\b/u),
+    startup: failed(/\brun dev(?:\s|$)/u),
+  });
   const uncovered = (verification.journeys ?? []).filter((journey) => journey.result !== "passed");
   if (incompleteFiles.length === 0 && uncovered.length === 0) return diagnosis;
   const missingEvidence = incompleteFiles.length > 0
@@ -328,8 +335,9 @@ async function main(): Promise<void> {
   await linkBuildPlan(plan, spec, outputDirectory);
   await trace.record("linking", "completed", "Deterministic routes, exports, and entry points were linked.");
 
-  let verification = unavailableAppVerification("Pi did not complete with audited model usage");
-  if (builder.exitCode === 0) {
+  let verification = unavailableAppVerification("Pi did not complete before the run deadline");
+  // An interrupted response can leave repairable files. Verification, not process exit alone, diagnoses them.
+  if (!builder.timedOut) {
     const diagnosisKeys = new Set<string>();
     for (let attempt = 0; attempt <= MAX_REPAIR_CYCLES; attempt += 1) {
       const verificationDirectory = path.join(artifactDirectory, "verification", `attempt-${attempt}`);
@@ -389,6 +397,8 @@ async function main(): Promise<void> {
         diagnosis_key: diagnosis.key,
         remaining_model_calls: remainingCalls,
       });
+      // A repair may change previously passing behavior before failing or timing out.
+      verification = unavailableAppVerification(`Repair attempt ${repairAttempt} has not been verified`);
       const repair = await runPi(
         buildRepairPiArguments(
           spec,
@@ -424,7 +434,7 @@ async function main(): Promise<void> {
       );
       await linkBuildPlan(plan, spec, outputDirectory);
       await trace.record("linking", "completed", `Relinked after repair attempt ${repairAttempt}.`);
-      if (repair.exitCode !== 0) break;
+      if (repair.timedOut) break;
     }
   }
 

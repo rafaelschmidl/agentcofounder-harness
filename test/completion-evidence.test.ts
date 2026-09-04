@@ -46,6 +46,48 @@ describe("generated artifact evidence", () => {
     expect(diagnosis.evidence).toContain("Write their complete implementation");
     expect(diagnosis.evidence).not.toContain("- src/product/domain.ts");
   });
+
+  it("routes a truncated CSS build failure to CSS even when no journey tests could execute", async () => {
+    const app = await mkdtemp(path.join(os.tmpdir(), "acf-truncated-style-"));
+    directories.push(app);
+    const artifactsDirectory = path.join(app, "artifacts");
+    await mkdir(artifactsDirectory);
+    await writeFile(path.join(artifactsDirectory, "app-build.log"),
+      `error during build:\n[vite:css] [postcss] ${app}/src/product/styles.css:8:1: Unclosed block\n`);
+    const diagnosis = await diagnoseVerification(artifactsDirectory, app, {
+      passed: false,
+      checks: [
+        { command: "vitest run", journey: "Test collection failed", result: "failed" },
+        { command: "npm run build", journey: "Build failed", result: "failed" },
+        { command: "npm run dev", journey: "Startup failed", result: "failed" },
+      ],
+      journeys: reconcileJourneyTests(undefined, [{ id: "journey_create" }]),
+    });
+    expect(diagnosis.stage).toBe("build");
+    expect(diagnosis.permittedPaths).toEqual(["src/product/styles.css"]);
+    expect(diagnosis.evidence).toContain("Unclosed block");
+    expect(diagnosis.evidence).not.toContain("- src/product/product.test.tsx");
+  });
+
+  it("uses test collection failure evidence when there are no failed assertions", async () => {
+    const app = await mkdtemp(path.join(os.tmpdir(), "acf-test-collection-"));
+    directories.push(app);
+    const artifactsDirectory = path.join(app, "artifacts");
+    await mkdir(artifactsDirectory);
+    await writeFile(path.join(artifactsDirectory, "app-test.log"),
+      `Error: invalid import in ${app}/src/product/App.tsx:12:1\n`);
+    const diagnosis = await diagnoseVerification(artifactsDirectory, app, {
+      passed: false,
+      checks: [
+        { command: "vitest run", journey: "Test collection failed", result: "failed" },
+        { command: "npm run build", journey: "Build passed", result: "passed" },
+      ],
+      journeys: reconcileJourneyTests(undefined, [{ id: "journey_create" }]),
+    });
+    expect(diagnosis.stage).toBe("tests");
+    expect(diagnosis.permittedPaths).toEqual(["src/product/App.tsx"]);
+    expect(diagnosis.evidence).toContain("invalid import");
+  });
 });
 
 describe("executed journey evidence", () => {

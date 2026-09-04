@@ -14,6 +14,12 @@ export interface RepairDiagnosis {
   permittedPaths: string[];
 }
 
+export interface FailedVerificationStages {
+  build?: boolean;
+  tests?: boolean;
+  startup?: boolean;
+}
+
 async function fingerprintSources(outputDirectory: string, permittedPaths: readonly string[]): Promise<string> {
   const sources = await Promise.all(permittedPaths.map(async (relativePath) => {
     try {
@@ -70,6 +76,7 @@ async function readTestFailures(file: string): Promise<string> {
 export async function collectRepairDiagnosis(
   verificationDirectory: string,
   outputDirectory: string,
+  failedStages: FailedVerificationStages = {},
 ): Promise<RepairDiagnosis> {
   const logs = [
     ["product tests", "app-test.log"],
@@ -83,7 +90,7 @@ export async function collectRepairDiagnosis(
   const buildLog = rawLogs.find((entry) => entry.label === "production build")?.content ?? "";
   const testLog = rawLogs.find((entry) => entry.label === "product tests")?.content ?? "";
   const startupLog = rawLogs.find((entry) => entry.label === "development startup")?.content ?? "";
-  const hasBuildErrors = /error TS\d+/u.test(buildLog);
+  const hasBuildErrors = failedStages.build === true || /error TS\d+/u.test(buildLog);
   const buildPaths = hasBuildErrors ? agentPaths(buildLog) : [];
   const assertionPaths = agentPaths(testFailures);
   const testingLibraryFailure = /TestingLibraryElementError|Unable to find|Found multiple elements/iu.test(testFailures);
@@ -93,15 +100,15 @@ export async function collectRepairDiagnosis(
   const startupPaths = agentPaths(startupLog);
   const stage = hasBuildErrors
     ? "build"
-    : testFailures !== "(no failed assertions in JSON report)" && testFailures !== "(test result JSON unavailable)"
+    : failedStages.tests === true || (testFailures !== "(no failed assertions in JSON report)" && testFailures !== "(test result JSON unavailable)")
       ? "tests"
-      : startupPaths.length > 0
+      : failedStages.startup === true || startupPaths.length > 0
         ? "startup"
         : "unknown";
   const permittedPaths = stage === "build"
     ? (buildPaths.length > 0
         ? buildPaths
-        : ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx"])
+        : ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx", "src/product/styles.css"])
     : stage === "tests"
       ? (defaultAppSmokeFailed
           ? ["src/product/App.tsx"]

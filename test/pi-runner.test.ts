@@ -72,6 +72,24 @@ describe("Pi response budget", () => {
 });
 
 describe("required product file completion", () => {
+  it("finishes the current response before stopping when the last file is followed by a correction", () => {
+    const completion = new PiFileCompletion("/app", ["src/product/styles.css"]);
+    completion.observe(summarizeEventLine(assistantEvent("toolUse", 2)));
+    completion.observe(summarizeEventLine(JSON.stringify({
+      type: "tool_execution_start", toolName: "write", toolCallId: "style", args: { path: "src/product/styles.css" },
+    })));
+    expect(completion.observe(summarizeEventLine(JSON.stringify({
+      type: "tool_execution_end", toolName: "write", toolCallId: "style", isError: false,
+    })))).toBe(false);
+    expect(completion.completedFiles).toEqual(["src/product/styles.css"]);
+    completion.observe(summarizeEventLine(JSON.stringify({
+      type: "tool_execution_start", toolName: "edit", toolCallId: "correction", args: { path: "src/product/App.tsx" },
+    })));
+    expect(completion.observe(summarizeEventLine(JSON.stringify({
+      type: "tool_execution_end", toolName: "edit", toolCallId: "correction", isError: false,
+    })))).toBe(true);
+  });
+
   it("does not substitute a repeated App write for the stylesheet", () => {
     const files = ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx", "src/product/styles.css"];
     const completion = new PiFileCompletion("/app", files);

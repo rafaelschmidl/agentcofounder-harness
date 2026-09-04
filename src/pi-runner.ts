@@ -96,13 +96,15 @@ export class PiFileCompletion {
   private readonly required: Set<string>;
   private readonly pending = new Map<string, string>();
   private readonly completed = new Set<string>();
+  private pendingResponseTools = 0;
 
   constructor(private readonly cwd: string, requiredPaths: readonly string[] = []) {
     this.required = new Set(requiredPaths.map((file) => path.resolve(cwd, file)));
   }
 
   get complete(): boolean {
-    return this.required.size > 0 && [...this.required].every((file) => this.completed.has(file));
+    return this.required.size > 0 && this.pendingResponseTools === 0 &&
+      [...this.required].every((file) => this.completed.has(file));
   }
 
   get completedFiles(): string[] {
@@ -110,6 +112,7 @@ export class PiFileCompletion {
   }
 
   observe(summary: EventSummary): boolean {
+    if (summary.assistantCall) this.pendingResponseTools = summary.toolCalls;
     if (summary.toolExecutionStarted && summary.toolCallId && summary.toolPath &&
         (summary.toolName === "write" || summary.toolName === "edit")) {
       const file = path.resolve(this.cwd, summary.toolPath);
@@ -120,6 +123,7 @@ export class PiFileCompletion {
       this.pending.delete(summary.toolCallId);
       if (file && summary.toolExecutionSucceeded) this.completed.add(file);
     }
+    if (summary.toolExecutionEnded && this.pendingResponseTools > 0) this.pendingResponseTools -= 1;
     return this.complete;
   }
 }
