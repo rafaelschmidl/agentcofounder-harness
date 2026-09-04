@@ -26,6 +26,7 @@ export const BASE_UI_STYLES = `@layer foundation {
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 :where(button, input, select, textarea) { font: inherit; }
 :where(button, a, input, select, textarea) { -webkit-tap-highlight-color: transparent; }
@@ -107,9 +108,12 @@ p { margin-bottom: .75rem; }
 .form-actions { padding-top: 4px; }
 
 .record-list { list-style: none; margin: 0; padding: 0; }
-.record-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.record-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .record-row:first-child { border-top: 1px solid var(--line); }
 .record-row > * { min-width: 0; }
+.record-row > :first-child { flex: 1 1 18rem; }
+.record-row > .row-actions { flex: 0 1 auto; max-width: 100%; }
+.row-actions > :where(button, .button) { min-width: 44px; max-width: 100%; }
 .record-title { margin: 0 0 3px; font-size: 1rem; font-weight: 650; overflow-wrap: anywhere; }
 .record-meta { margin: 0; overflow-wrap: anywhere; }
 .record-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 20px; list-style: none; margin: 0; padding: 0; }
@@ -119,7 +123,7 @@ p { margin-bottom: .75rem; }
 :where(th) { color: var(--muted); font-size: .75rem; font-weight: 600; text-align: left; }
 :where(th, td) { padding: 13px 12px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; vertical-align: middle; }
 :where(thead) { background: var(--surface-muted); }
-.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 5px; background: var(--surface-muted); color: var(--muted); font-size: .75rem; font-weight: 650; white-space: nowrap; }
+.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 5px; background: var(--surface-muted); color: var(--muted); font-size: .75rem; font-weight: 650; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .status-badge[data-tone="success"] { color: var(--success); background: var(--success-soft); }
 .status-badge[data-tone="accent"] { color: var(--accent); background: var(--accent-soft); }
 .status-badge[data-tone="error"] { color: var(--danger); background: var(--danger-soft); }
