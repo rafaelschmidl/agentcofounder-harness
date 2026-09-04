@@ -36,7 +36,7 @@ export function builderExecutionContext(spec: ProductSpec, plan: BuildPlan) {
     exclusions: spec.exclusions,
     resolved_conflicts: spec.conflicts.map(({ description, resolution }) => ({ description, resolution })),
     build: {
-      blocks: plan.blocks.map(({ id, config }) => ({ id, config })),
+      blocks: plan.blocks.map(({ id }) => ({ id })),
       custom_slots: plan.custom_slots.map(({ id, purpose }) => ({ id, purpose })),
       owned_paths: plan.file_ownership.filter((entry) => entry.owner === "AGENT").map((entry) => entry.path),
       routes: plan.routes,
