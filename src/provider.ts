@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 
@@ -8,6 +9,10 @@ export const DEFAULT_MODEL = "zai-org/GLM-5.2";
 export const DEFAULT_THINKING = "high";
 
 export function resolveBergetExtension(): string {
+  return fileURLToPath(new URL("../solution/extensions/berget-provider.ts", import.meta.url));
+}
+
+export function resolveOfficialBergetExtension(): string {
   return path.join(path.dirname(require.resolve("@bergetai/pi-provider/package.json")), "index.ts");
 }
 
