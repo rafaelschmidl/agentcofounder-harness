@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Ajv } from "ajv";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import repairCompletion from "../solution/extensions/repair-completion.js";
 import { buildBuilderPiArguments, buildRepairPiArguments } from "../src/builder.js";
@@ -30,5 +31,16 @@ describe("repair completion tool", () => {
     expect(repair.at(-1)).toContain("call finish_repair");
     expect(builder.some((argument) => argument.endsWith("/repair-completion.ts"))).toBe(false);
     expect(builder[builder.indexOf("--tools") + 1]).toBe("write");
+  });
+
+  it("accepts a detailed repair handoff instead of spending calls shortening it", () => {
+    const api = { registerTool: vi.fn() };
+    repairCompletion(api as unknown as ExtensionAPI);
+    const tool = api.registerTool.mock.calls[0]![0] as { parameters: object };
+    const validate = new Ajv().compile(tool.parameters);
+    const summary = "Fixed the storage fixture, scoped the borrower input to its book row, and preserved the persistence and validation assertions. ".repeat(4);
+    expect(summary.length).toBeGreaterThan(300);
+    expect(validate({ summary })).toBe(true);
+    expect(validate({ summary: 42 })).toBe(false);
   });
 });

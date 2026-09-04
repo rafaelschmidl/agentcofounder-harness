@@ -29,9 +29,21 @@ export const PRODUCT_SUMMARY = ${JSON.stringify(productSummary)};
       path: "src/test/setup.ts",
       content: `import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 
-afterEach(cleanup);
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+});
+
+afterEach(() => {
+  try {
+    cleanup();
+  } finally {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});
 `,
     },
   ];
