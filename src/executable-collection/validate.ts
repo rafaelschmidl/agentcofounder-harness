@@ -73,6 +73,11 @@ export function collectionExecutionErrors(spec: ProductSpec): string[] {
       const references = [...Object.keys(guard.equals ?? {}), ...(guard.empty ?? []), ...(guard.present ?? [])];
       if (!references.length || references.some((field) => !Object.hasOwn(hidden, field))) reject('state guards must use declared hidden fields');
     }
+    // Auxiliary transition data (for example an assignee) can be just as stateful
+    // as the field used by state_binding. Generic create/edit bypasses transitions.
+    const actionOwnedFields = new Set(contract.actions.flatMap((action) => Object.keys(action.assign)));
+    const editableActionFields = fields.filter((field) => actionOwnedFields.has(field.key)).map((field) => field.key);
+    if (editableActionFields.length) reject(`workflow-assigned fields ${editableActionFields.join(', ')} must be hidden, not general create/edit fields; use action inputs for transition data. Do not drop any source requirement to edit these fields`, true);
   } else if (contract.actions.some((action) => action.transition_id)) reject('transition_id requires a canonical workflow binding');
   try { compileCollection({ ...contract, storageKey: 'validation-only' }); }
   catch (error) { reject(error instanceof Error ? error.message : String(error)); }
