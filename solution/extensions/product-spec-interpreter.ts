@@ -88,6 +88,17 @@ export default function productSpecInterpreter(pi: ExtensionAPI) {
       promptGuidelines: [
         "Submit draft initially. If rejected, use replacements to fix erroneous values in the retained draft. Supply either draft or replacements, never both.",
       ],
+      executionMode: "sequential",
+      prepareArguments(args) {
+        // Pi validates the tool schema before execute. Preserve a complete draft
+        // at this boundary so an enum/schema rejection is repairable as well.
+        // Return the original arguments: both tool and canonical validation stay strict.
+        if (typeof args === "object" && args !== null && !Array.isArray(args)
+          && Object.hasOwn(args, "draft") && !Object.hasOwn(args, "replacements")) {
+          retainedDraft = structuredClone((args as { draft: unknown }).draft);
+        }
+        return args as { draft?: unknown; replacements?: { path: string; value: unknown }[] };
+      },
       parameters: Type.Object({
         draft: Type.Optional(Type.Unsafe<unknown>(draftSchema)),
         replacements: Type.Optional(Type.Array(Type.Object({
