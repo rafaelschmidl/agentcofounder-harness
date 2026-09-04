@@ -1,4 +1,5 @@
 import type { CapabilityBlock, MaterializedFile } from "./types.js";
+import { RECORD_FORM_SOURCE } from "./record-form.js";
 
 const objectSchema = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: "object",
@@ -230,6 +231,7 @@ export class DeterministicPaymentStub implements PaymentProvider {
 
 function accessibleShellFiles(): MaterializedFile[] {
   return [
+    { path: "src/system/record-form.tsx", content: RECORD_FORM_SOURCE },
     {
       path: "src/system/ui.tsx",
       content: `import { useEffect, useId, type PropsWithChildren, type ReactNode } from "react";
@@ -421,13 +423,13 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
   },
   {
     id: "ui.accessible-shell",
-    version: "1.1.0",
+    version: "1.2.0",
     config_schema: objectSchema({}, []),
     capabilities: ["responsive-shell", "accessible-forms", "empty-states", "visible-errors", "status-feedback"],
     dependencies: ["app.foundation"],
     conflicts: [],
-    owned_files: ["src/system/ui.tsx"],
-    exported_interfaces: ["AppShell", "SectionHeader", "FieldError", "EmptyState", "StatusMessage"],
+    owned_files: ["src/system/ui.tsx", "src/system/record-form.tsx"],
+    exported_interfaces: ["AppShell", "SectionHeader", "FieldError", "EmptyState", "StatusMessage", "RecordForm", "RecordField", "FormResult", "RecordFormProps"],
     materialize: accessibleShellFiles,
     checks: ["accessible names", "keyboard operation", "responsive layout"],
   },

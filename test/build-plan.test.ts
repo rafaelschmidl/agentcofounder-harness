@@ -206,6 +206,32 @@ describe("deterministic BuildPlan compiler", () => {
     expect(prompts.appContext).toContain("DeterministicPaymentStub");
   });
 
+  it("derives the optional form API from runtime exports and prop signatures without exposing its implementation", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "record-form-api-"));
+    temporaryDirectories.push(directory);
+    const spec = validProductSpec();
+    const plan = compileProductSpec(spec);
+    await writeFile(path.join(directory, "AGENTS.md"), "# Generated app contract\n", "utf8");
+    await materializeBuildPlan(plan, spec, directory);
+    const helperPath = path.join(directory, "src/system/record-form.tsx");
+    const source = await readFile(helperPath, "utf8");
+    // Simulate a future signature and export change. Both must reach the model
+    // automatically rather than relying on a separately maintained API string.
+    await writeFile(helperPath, source.replace("submitLabel: string;", "submitLabel: string;\n  futureOption?: string;")
+      + "\nexport function futureHelper(value: string): string { return value.trim(); }\n", "utf8");
+
+    const prompts = await loadBuilderPrompts(directory, plan);
+    const helperContext = prompts.appContext.split("### src/system/record-form.tsx")[1]?.split("### ")[0];
+    expect(helperContext).toContain("RecordField");
+    expect(helperContext).toContain("FormResult");
+    expect(helperContext).toContain("RecordFormProps");
+    expect(helperContext).toContain("declare function RecordForm");
+    expect(helperContext).toContain("futureOption?: string");
+    expect(helperContext).toContain("declare function futureHelper(value: string): string");
+    expect(helperContext).not.toContain("setValues");
+    expect(helperContext).not.toContain("value.trim()");
+  });
+
   it("materializes rollback-safe, idempotent commerce primitives", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "commerce-primitives-"));
     temporaryDirectories.push(directory);

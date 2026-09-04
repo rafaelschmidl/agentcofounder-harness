@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import type { BuildPlan } from "./build-plan/types.js";
 import type { ProductSpec } from "./product-spec/types.js";
 import { providerFromEnvironment, providerPiArguments } from "./provider.js";
@@ -132,7 +133,7 @@ export async function loadBuilderPrompts(
     readFile(path.join(outputDirectory, "AGENTS.md"), "utf8"),
     Promise.all(interfacePaths.map(async (relativePath) => ({
       relativePath,
-      content: await readFile(path.join(outputDirectory, relativePath), "utf8"),
+      content: materializedInterfaceContext(relativePath, await readFile(path.join(outputDirectory, relativePath), "utf8")),
     }))),
   ]);
   const interfaceContext = interfaces
@@ -142,6 +143,22 @@ export async function loadBuilderPrompts(
     systemPrompt,
     appContext: `${appInstructions.trim()}\n\n## Materialized system interfaces\n\n${interfaceContext}`,
   };
+}
+
+function materializedInterfaceContext(relativePath: string, source: string): string {
+  if (relativePath !== "src/system/record-form.tsx") return source;
+  // Derive the API from the shipped implementation so optional helper guidance
+  // cannot silently omit an export or lag a changed prop signature.
+  const declaration = ts.transpileDeclaration(source, {
+    fileName: relativePath,
+    compilerOptions: { jsx: ts.JsxEmit.ReactJSX, isolatedDeclarations: true },
+    reportDiagnostics: true,
+  });
+  const errors = declaration.diagnostics?.filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error) ?? [];
+  if (errors.length > 0) {
+    throw new Error(`Cannot describe ${relativePath}: ${errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, " ")).join("; ")}`);
+  }
+  return `// Public declarations generated from the installed helper; implementation is already materialized.\n${declaration.outputText}`;
 }
 
 export async function loadRepairPrompts(
