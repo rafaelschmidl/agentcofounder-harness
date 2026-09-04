@@ -9,6 +9,7 @@
   },
   "scripts": {
     "challenge": "node --env-file-if-exists=.env.local --import tsx src/run-challenge.ts",
+    "semantic-review": "node --env-file-if-exists=.env.local --import tsx src/run-semantic-review.ts",
     "validate:result": "node --import tsx src/validate-result.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

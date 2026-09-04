@@ -31,6 +31,7 @@ import {
 } from "./result.js";
 import { collectUsageFromJsonLines } from "./usage.js";
 import { RunTrace } from "./trace.js";
+import { buildSemanticReviewInput, MAX_REVIEW_RESPONSES, runSemanticReview, semanticReviewRepairDiagnosis } from "./semantic-review.js";
 import type { AppVerification, RunResult } from "./types.js";
 import { validateResultObject } from "./validate-result.js";
 import { captureRequiredArtifacts, portHasListener, unavailableAppVerification, verifyGeneratedApp } from "./verify-app.js";
@@ -95,6 +96,7 @@ async function readRetainedPiEvents(artifactDirectory: string): Promise<string> 
   const eventFiles = [
     path.join(artifactDirectory, "interpreter", "interpreter.events.jsonl"),
     path.join(artifactDirectory, "builder", "events.jsonl"),
+    path.join(artifactDirectory, "semantic-review", "events.jsonl"),
   ];
   const repairsDirectory = path.join(artifactDirectory, "repairs");
   try {
@@ -131,6 +133,7 @@ Environment:
   CHALLENGE_THINKING      Optional Pi thinking level (default: off)
   CHALLENGE_BUILDER_THINKING Optional builder thinking level (default: off)
   CHALLENGE_TIMEOUT_MS    Wall-clock limit for the full run (default: 1800000)
+  CHALLENGE_SEMANTIC_REVIEW Set to 1 for an experimental source review after functional checks (default: off)
 `);
 }
 
@@ -339,6 +342,7 @@ async function main(): Promise<void> {
   // An interrupted response can leave repairable files. Verification, not process exit alone, diagnoses them.
   if (!builder.timedOut) {
     const diagnosisKeys = new Set<string>();
+    let semanticReviewed = false;
     for (let attempt = 0; attempt <= MAX_REPAIR_CYCLES; attempt += 1) {
       const verificationDirectory = path.join(artifactDirectory, "verification", `attempt-${attempt}`);
       await mkdir(verificationDirectory, { recursive: true });
@@ -356,9 +360,37 @@ async function main(): Promise<void> {
           : `Verification attempt ${attempt} produced targeted failure evidence.`,
         { attempt, checks: verification.checks },
       );
-      if (verification.passed || attempt === MAX_REPAIR_CYCLES) break;
+      let semanticDiagnosis: RepairDiagnosis | undefined;
+      if (verification.passed && !semanticReviewed && attempt < MAX_REPAIR_CYCLES && process.env.CHALLENGE_SEMANTIC_REVIEW === "1") {
+        semanticReviewed = true;
+        const reviewedEvents = path.join(artifactDirectory, "semantic-review", "events.jsonl");
+        try {
+          const prior = (await Promise.all(stageEventFiles.map((file) => readFile(file, "utf8")))).join("");
+          // Keep at least two responses available to investigate a finding and repair it.
+          const reviewCalls = Math.min(MAX_REVIEW_RESPONSES, MAX_PROVIDER_RESPONSES - collectUsageFromJsonLines(prior).model_calls - 2);
+          const reviewTime = Math.min(180_000, runDeadline - Date.now());
+          if (reviewCalls > 0 && reviewTime >= 1_000) {
+            const input = await buildSemanticReviewInput(idea, spec, plan, outputDirectory);
+            const review = await runSemanticReview(input, path.dirname(reviewedEvents), reviewTime, reviewCalls);
+            semanticDiagnosis = semanticReviewRepairDiagnosis(review, input);
+            await trace.record("semantic-review", review.status === "reviewed" ? "completed" : "failed",
+              "Experimental source review retained hypotheses; it did not certify or invalidate functional verification.", {
+                status: review.status, findings: review.review?.findings.length ?? 0,
+                model_calls: review.usage.model_calls, repair_hypothesis: Boolean(semanticDiagnosis), errors: review.errors,
+              });
+          } else {
+            await trace.record("semantic-review", "decision", "Skipped optional review because insufficient run budget remained.");
+          }
+        } catch (error) {
+          await trace.record("semantic-review", "failed", "Optional source review was unavailable; prior functional evidence remains unchanged.", { error: String(error) });
+        } finally {
+          // Retain provider usage even if optional review setup or result processing failed.
+          if (await readFile(reviewedEvents, "utf8").then(() => true, () => false)) stageEventFiles.push(reviewedEvents);
+        }
+      }
+      if ((verification.passed && !semanticDiagnosis) || attempt === MAX_REPAIR_CYCLES) break;
 
-      const diagnosis = await diagnoseVerification(verificationDirectory, outputDirectory, verification);
+      const diagnosis = semanticDiagnosis ?? await diagnoseVerification(verificationDirectory, outputDirectory, verification);
       if (diagnosisKeys.has(diagnosis.key)) {
         await trace.record("repair", "failed", "Refused a repair with an unchanged diagnosis.", {
           attempt: attempt + 1,
