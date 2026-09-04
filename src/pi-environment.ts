@@ -13,6 +13,7 @@ const PASSTHROUGH = [
   "BERGET_API_URL",
   "BERGET_AUTH_URL",
   "BERGET_INFERENCE_URL",
+  "SYSTEM_V0_ALLOWANCE_LEDGER",
 ] as const;
 
 export async function createPiEnvironment(

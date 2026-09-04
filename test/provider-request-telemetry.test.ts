@@ -7,10 +7,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, expect, it, vi } from "vitest";
 import bergetProvider from "../solution/extensions/berget-provider.js";
 import { instrumentProviderFetch } from "../src/provider-request-telemetry.js";
+import { initializeProviderAllowance } from "../src/provider-allowance.js";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-async function fixture(run: (provider: Provider, logPath: string, requests: { headers: http.IncomingHttpHeaders; body: string }[]) => Promise<void>) {
+async function fixture(run: (provider: Provider, logPath: string, requests: { headers: http.IncomingHttpHeaders; body: string }[]) => Promise<void>, guarded = false) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "provider-telemetry-"));
   const logPath = path.join(directory, "provider-requests.jsonl");
   const requests: { headers: http.IncomingHttpHeaders; body: string }[] = [];
@@ -35,6 +36,11 @@ async function fixture(run: (provider: Provider, logPath: string, requests: { he
     vi.stubEnv("BERGET_API_URL", `http://127.0.0.1:${address.port}`);
     vi.stubEnv("BERGET_INFERENCE_URL", `http://127.0.0.1:${address.port}/v1`);
     vi.stubEnv("SYSTEM_V0_PROVIDER_REQUEST_LOG", logPath);
+    if (guarded) {
+      const ledgerPath = path.join(directory, "allowance.json");
+      await initializeProviderAllowance(ledgerPath, { version: 1, currency: "EUR", limit: 1, baseline_cost: 0, baseline_evidence: "local-fixture", model_id: "zai-org/GLM-5.2", context_window: 327680, input_price_per_token: 0.000001, output_price_per_token: 0.000002, requests: [] });
+      vi.stubEnv("SYSTEM_V0_ALLOWANCE_LEDGER", ledgerPath);
+    }
     let registered: Provider | undefined;
     await bergetProvider({ registerProvider: (provider: Provider) => { registered = provider; } } as unknown as ExtensionAPI);
     if (!registered) throw new Error("Official provider failed to register");
@@ -68,6 +74,21 @@ it("retains safe wire and HTTP evidence through the installed official provider 
     expect(events[1]).toMatchObject({ status: 200, provider_request_id: "local-provider-request-17" });
     for (const secret of ["fixture-private-system", "fixture-private-prompt", "fixture-private-key", "fixture-sensitive-header", "127.0.0.1"]) expect(text).not.toContain(secret);
   });
+}, 20_000);
+
+it("uses and durably settles the shared guard through the installed official provider", async () => {
+  await fixture(async (provider, logPath, requests) => {
+    const result = await provider.streamSimple(provider.getModels()[0]!, {
+      messages: [{ role: "user", content: "fixture-private-prompt", timestamp: 1 }],
+    }, { apiKey: "fixture-private-key", maxTokens: 64, maxRetries: 0 }).result();
+    expect(result.stopReason).toBe("stop");
+    expect(requests).toHaveLength(1);
+    const ledger = JSON.parse(await readFile(path.join(path.dirname(logPath), "allowance.json"), "utf8"));
+    expect(ledger.requests).toHaveLength(1);
+    expect(ledger.requests[0]).toMatchObject({ status: "measured", output_token_cap: 64, reserved_cost: 0.327808, input_tokens: 10, output_tokens: 1, cost_total: 0.000012 });
+    const events = (await readFile(logPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+    expect(events.find((event) => event.event === "allowance_usage_confirmed")).toMatchObject({ input_tokens_including_cache: 10, output_tokens: 1 });
+  }, true);
 }, 20_000);
 
 it("records the original connection cause before the installed SDK normalizes it, with exactly one transport attempt", async () => {
