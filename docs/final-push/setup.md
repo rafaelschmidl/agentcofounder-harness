@@ -48,10 +48,10 @@ Use native macOS for the development loop with `mise exec node@22.19.0 -- …` a
 
 Docker is not a prerequisite for starting the plan or daily experiments. At Rafael's request, container validation is deferred to the release candidate. Docker Desktop was started and reports Linux ARM64; that alone is not a packaging pass. Apple Silicon describes the CPU, while macOS/Linux dependency behavior can differ. The release should receive one focused compatibility proof against the organizer environment.
 
-Rafael authorized the remaining Berget credit for development, validation and experimentation. The screenshot shows EUR 19.48 available. It is additional to historical spending, not a reset of history or permission to buy more credit.
+Personal provider allowances and detailed spending records are local to each collaborator. Jones uses his own credentials and credit; Rafael’s local campaign does not impose a shared team allowance.
 
 - Canonical local campaign directory: `agentcofounder-eval/evidence/final-push-2026-09-04/`.
-- Its cost ledger copies the historical 22 entries unchanged, totaling 1.922450 Pi-reported units; the working cumulative ceiling is 21.402450. Authorization metadata records the additional 19.48, historical count/total and source hash.
+- Its local ledger preserves campaign authorization, historical usage, attempts and corrections; it is ignored by Git.
 - Pi cost is an accounting proxy, not a verified currency conversion to Berget EUR. Actual available provider credit remains the spending boundary. Reconcile with provider usage before approaching the allowance and retain runway for final validation.
 - One coordinator launches paid runs. Run them serially because the current evaluator shares port 3000 and has no cross-process budget lock. Verify the canonical existing ledger before every invocation; the current evaluator can otherwise create a fresh default ledger in a mistyped directory.
 - Record each attempt and retain failures. If a call is interrupted or usage is missing from the ledger, reconcile its raw provider/Pi evidence before further paid work. The existing 0.50 projection is admission estimation, not a live per-run monetary cutoff. Persistent pending-run and locking improvements belong in AGE-24 if needed before unattended experimentation.

@@ -1,33 +1,52 @@
 # Candidate evidence, 4 September 2026
 
-Development record at 14:10 UTC. This is not a release or a claim of submission readiness. The private `final-push/2026-09-04` branch preserves the work; `main` remains the MVP.
+Development checkpoint at 15:10 UTC. The private `final-push/2026-09-04` branches preserve the work; `main` remains the MVP. This is a stable development base, not a claim of final candidate qualification.
 
-## What the latest completed generations show
+## Current integrated source
 
-The `7d022bf` Book run failed qualification. Its final build and startup passed, but three generated assertions expected the wrong visible state or wording. A disposable test-only calibration fixed those expectations and produced ten passing assertions; Vitest still exited unsuccessfully because the app threw an unhandled storage exception. The app published new React state before saving it, while its own recovery test wrongly accepted the unsaved record. Its optional collection definition was unused. Browser inspection also confirmed a duplicate React mounting warning. The warm serif layout and compact responsive rows improve on the early output, but do not establish exceptional design or reliable generation.
+Harness merge `41a91f540baeed17851c2caf44b0e2b766021831` combines experimental compiler `9c8ee36d74e26ba23decd779ab06866351c88650` with reliability changes through `92e3ad5`. Evaluator revision: `6d304d0908c04213fe9bb4bfbff5a076a1bea041`.
 
-The same revision's commerce run reached its outer timeout with tests still untouched and two remaining App compilation errors. Three request timeouts and an unfinished retry make the reported usage incomplete. This output is retained as a failure, not a working commerce candidate.
+Native Node 22.19.0 validation: harness typecheck, 197/197 tests and app build passed; evaluator 30/30 tests passed. The empty app-template test suite is not generated-product evidence. A shared dependency-cache rename warning appeared during simultaneous disposable Vite fixtures; all tests and readiness checks passed. Fresh model generation from this combined revision remains outstanding.
 
-The high-reasoning Book run at the old 8,192-token response cap used two whole builder/repair responses for reasoning without writing files. Its complete reported usage was retained, but no application was produced. The new configurable response cap makes a better-configured trial possible; it does not by itself show that higher reasoning wins.
+## Actual generated products
 
-Detailed independent audit and disposable calibration: `/private/tmp/acf-final-failure-audit-2026-09-04/REPORT.md`. Original runs remain under the evaluator's `evidence/final-push-2026-09-04/runs` directory. No failed app or original report was overwritten.
+Fresh GLM-5.2 runs of earlier compiler revision `d6f81aa158588f53e3186581f059b5ce9aa8a096`, evaluator `fc8d43e50cf885c145bde5c895e587d6cb78f6a2`, used thinking off, a 32,768 response cap and `CHALLENGE_EXECUTABLE_COLLECTION=1`. Both selected compiler-owned domains and eventually passed generated internal verification after repairs.
 
-## Changes supported by those failures
+| Product | Independent final journeys | Additional observations |
+| --- | --- | --- |
+| Shelf Ledger, public Book prompt | 10/10 | Create, lend, edit, return, delete, category preservation and reload work. Failed storage preserves mounted UI, saved state and draft with visible errors. |
+| FeedbackLane, public SaaS prompt | 7/7 | Request creation, filters, categories, forward workflow and reload work. Failed storage preserves state and draft with visible errors. |
 
-- A repair diagnosis is marked attempted only after a completed non-error model response. A provider startup failure no longer consumes the opportunity to address that unchanged diagnosis.
-- The installed official Berget initializer now has a small bounded retry wrapper for transient catalog failures. Permanent errors remain errors; model metadata, pricing, capabilities and auth still come from the installed provider.
-- Initial file generation terminates inside Pi after all distinct owned files succeed and the current tool batch drains. Installed Pi against a local HTTP server proved exactly one request for complete three- and four-file batches, with no synthetic aborted response. Duplicates, failed writes and protected-path attempts cannot substitute for a missing file. Repairs keep their explicit handoff behavior.
-- Builder context drops repeated provenance, reciprocal journey mappings, block configuration and ownership bookkeeping. Complete canonical artifacts remain intact; any additional verification checks remain explicit. The first projection reduction measured 2,138 net characters on the retained public Book spec before the further block-config removal. This is a character measurement, not a measured token saving.
-- Custom-generation guidance explicitly assigns mounting to the linker and requires saving the complete next state before publishing it, with visible errors and retained drafts on failure.
+These totals use evaluator `6d304d0` on byte-identical retained final apps. Original reports were 3/10 and 3/7 because the evaluator assumed row-contained editors or exact category/filter copy. Calibration accepts named external forms/dialogs and semantic controls. Deliberately broken category persistence, priority filtering and action entry/submission still fail. Original reports and intermediate calibrations remain retained; no app was hand-patched to improve its result.
 
-The combined native suite passed 160 of 161 tests before one stale assertion was updated from the upstream extension path to the new official-provider wrapper path. The affected six-test suite then passed; typecheck and app build passed. The new provider seam and in-process completion tests exercise the installed runtime without inference spending.
+Local evidence under evaluator `evidence/final-push-2026-09-04/`:
 
-## Experiments still unresolved
+- Runs `book-lending-d6f81aa15858-2026-09-04T14-15-17.287Z-70a459a3` and `saas-feedback-d6f81aa15858-2026-09-04T14-15-32.518Z-c631e735`.
+- `calibration/book-affordances-compiled-2/` and `calibration/saas-affordances-compiled-2/`: final independent reports and evaluator provenance.
+- `calibration/book-affordances-compiled-1/save-failure.json`: compiled recovery versus custom implementations that blanked the root.
+- `calibration/compiled-visual-2026-09-04/book-desktop.png`, `feedback-desktop.png` and `feedback-mobile.png`: unmodified generated interfaces populated through visible UI actions.
 
-Fresh runs started at 13:58/13:59 UTC compare a current custom generator with a 32,768-token reasoning allowance and an opt-in executable-collection branch at 8,192 tokens, both through Berget GLM-5.2. They are exploratory candidates, not a single-variable A/B test. They share a raw public Book prompt but independently interpret it.
+The list and board compositions differ, but visual quality is still ordinary: Book has a weak-contrast return action; Feedback has uneven empty-state alignment and mobile spacing. Some controls are below the requested touch-target size. Polish and generalization remain open work.
 
-The opt-in run selected custom fallback. Its initial compiled draft was representable, but alignment errors and misleading fallback advice caused the model to abandon it. That run therefore assesses the fallback, not the compiled domain. A subsequent isolated change is improving contract alignment and diagnostics; fresh compiled-path generation is still required.
+## What the integrated changes address
 
-The compiler experiment preserves free product JSX/CSS and independent generated journeys while owning suitable flat collection behavior. Its offline tests are feasibility evidence, not fresh-model, generalization or cost evidence. Untouched assessment prompts remain reserved for a stronger candidate.
+- Supported flat collection behavior is compiled, including guarded transitions, editing, hidden state preservation and atomic save/recovery. Generated App, CSS and independent UI journeys remain free. Unsupported domains retain custom generation. The experiment remains opt-in.
+- Exact field bindings and audited unambiguous container normalization reduce avoidable interpretation repairs. Identifier aliases cannot shadow business fields. Offline replay reduces observed draft submissions; this is not measured fresh-run token savings.
+- Complete initial writes terminate natively after the batch drains. Successful-write feedback names remaining files. Repairs can finish a successful mixed write/handoff batch without another completion request. Protected domain writes remain blocked.
+- Builder context removes duplicated bookkeeping. Repair diagnostics group repeated errors while retaining affected journeys, unique failures and locations. A retained SaaS diagnosis shrank from 18,810 to 5,063 characters; this is not a measured token or quality claim.
+- Compiled instructions use the actual supplied APIs and concise visible journeys. Incorrect helper-import guidance was removed. AppShell permits a product-chosen brand mark instead of forcing a first-letter box.
+- Provider setup failures no longer consume substantive repair opportunities. Transport evidence retains original timeout causes and whether headers/body completion were observed.
 
-Accounting retains full conservative allowances for requests with unavailable final usage. Those allowances are not observed spending, and the cumulative proxy is not verified euro billing. No additional credit was purchased.
+## Important limits and retained failures
+
+Earlier custom high-reasoning and custom fallback Book products both pass the corrected 10-journey judge but crash on simulated storage failure. The earlier commerce attempt timed out with incomplete source and untouched tests. An 8,192-token high-reasoning attempt spent responses on thinking without producing files. None is a successful candidate.
+
+Generated tests are not an independent oracle: the compiled Book storage-failure test never submitted the form, and some repaired assertions became weaker. External fault injection established actual recovery. Interpretation also narrowed open category examples into closed choices; schema/compiler agreement cannot prove fidelity to the original prose.
+
+Untouched assessment prompts have not yet been generated. Evidence does not yet establish repeatability, broad generalization, a token-efficiency winner, or superiority of higher reasoning. Failed attempts and unknown usage remain recorded locally.
+
+## Collaboration surface
+
+Jones is taking generated design variety, coherence and quality. Branch from the latest pushed `final-push/2026-09-04`; his own tickets will describe his work when he starts. The coordinator continues reliability, fresh experiments and independent validation and integrates useful contributions at coherent milestones.
+
+Compiled generation exposes `definition`, `recordKeys`, `useProductCollection` and `ProductEditor` from `src/product/domain.ts`. The compiler owns that file; the agent owns App, CSS and product tests. Custom generation still owns four files. Likely design touchpoints are `src/build-plan/blocks.ts`, builder prompts and `product.experience`; communicate overlap before changing compiler interfaces. There is no fixed page template to preserve. Each collaborator uses their own provider credentials and development allowance.

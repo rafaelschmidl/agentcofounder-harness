@@ -6,7 +6,7 @@ Rafael accepted the outcome-led plan and explicitly requested implementation on 
 
 The scope is development and validation. Publication, submission, presentation preparation, release operations, and Docker work are outside this goal. Keep repositories private. Native macOS development, local commits, and milestone pushes to the existing repositories are authorized.
 
-The available additional Berget allowance is EUR 19.48 at campaign opening. Allocate it by usefulness without fixed spending buckets; count failed and interrupted attempts. Do not purchase credit. Contest-relevant evidence uses GLM-5.2 through Berget. Today's approximate midnight deadline is the outer time constraint; no artificial earlier deadline or required experiment matrix was accepted.
+Personal development allowances and spending records remain local to each collaborator; they do not constrain another collaborator’s provider credit. Count failed and interrupted attempts in the relevant local campaign. Contest-relevant evidence uses GLM-5.2 through Berget. Today's approximate midnight deadline is the outer time constraint; no artificial earlier deadline or required experiment matrix was accepted.
 
 The agent may change architecture, priorities, interfaces, experiments and delegation. The previous plan's fixed run counts, budget buckets, efficiency multiplier, handoff time, and release/publication tasks are not requirements. Use measured progress and evidence rather than speculative estimates to choose work. Linear and Git support progress; they do not prescribe a ceremony.
 
