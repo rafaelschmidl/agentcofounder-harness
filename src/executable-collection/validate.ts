@@ -77,7 +77,7 @@ export function collectionExecutionErrors(spec: ProductSpec): string[] {
     // as the field used by state_binding. Generic create/edit bypasses transitions.
     const actionOwnedFields = new Set(contract.actions.flatMap((action) => Object.keys(action.assign)));
     const editableActionFields = fields.filter((field) => actionOwnedFields.has(field.key)).map((field) => field.key);
-    if (editableActionFields.length) reject(`workflow-assigned fields ${editableActionFields.join(', ')} must be hidden, not general create/edit fields; use action inputs for transition data. Do not drop any source requirement to edit these fields`, true);
+    if (editableActionFields.length) reject(`workflow-assigned fields ${editableActionFields.join(', ')} must be hidden, not general create/edit fields; use action inputs for transition data. If ordinary editing was only an inferred UI choice, repair fields/hidden and the view to use the action instead. Do not drop any source requirement to edit these fields; choose mode custom only if the source actually requires ordinary edits that this contract cannot preserve`);
   } else if (contract.actions.some((action) => action.transition_id)) reject('transition_id requires a canonical workflow binding');
   try { compileCollection({ ...contract, storageKey: 'validation-only' }); }
   catch (error) { reject(error instanceof Error ? error.message : String(error)); }
