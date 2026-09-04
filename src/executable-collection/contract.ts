@@ -17,6 +17,7 @@ export interface FlatCollectionContract {
   storageKey: string; noun: string; titleKey: string;
   // Compiler metadata: canonical generated identifiers lower to the controller's id.
   canonicalIdentifier?: string;
+  canonicalFieldBindings?: Record<string, string>;
   fields: FieldRule[];
   hidden?: Record<string, { initial: string; choices?: string[]; required?: boolean }>;
   invariants?: Array<{ when: Guard; must: Guard; message: string }>;

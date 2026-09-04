@@ -1,12 +1,13 @@
 import { compileCollection, matchesGuard, type FlatCollectionContract, type Guard } from './contract.js';
 import type { ProductSpec } from '../product-spec/types.js';
+import { bindCollectionFields } from './bindings.js';
 
 /** Fill omitted structural metadata from canonical fields; explicit conflicts stay visible. */
-function canonicalCollectionContract(spec: ProductSpec): Extract<NonNullable<ProductSpec['collection_execution']>, { mode: 'compiled' }>['contract'] {
+function canonicalCollectionContract(spec: ProductSpec): Omit<FlatCollectionContract, 'storageKey' | 'canonicalIdentifier'> {
   const execution = spec.collection_execution;
   if (execution?.mode !== 'compiled') throw new Error('No compiled collection selected');
-  const contract = structuredClone(execution.contract);
   const fields = spec.entities.find((item) => item.id === execution.entity_id)?.fields ?? [];
+  const contract = bindCollectionFields(execution.contract, fields);
   for (const field of fields) {
     const editable = contract.fields.find((item) => item.key === field.id);
     const hidden = contract.hidden?.[field.id];
@@ -26,7 +27,9 @@ export function collectionExecutionErrors(spec: ProductSpec): string[] {
   if (!execution || execution.mode === 'custom') return [];
   const errors: string[] = [];
   const reject = (message: string, unsupported = false) => errors.push(`collection_execution: ${message}${unsupported ? '; choose mode custom to preserve these unsupported semantics' : ''}`);
-  const contract = canonicalCollectionContract(spec);
+  let contract: ReturnType<typeof canonicalCollectionContract>;
+  try { contract = canonicalCollectionContract(spec); }
+  catch (error) { return [`collection_execution: ${error instanceof Error ? error.message : String(error)}`]; }
   if (spec.persistence.mode !== 'LOCAL' || spec.entities.length !== 1 || spec.entities[0]?.id !== execution.entity_id
     || spec.entities.some((entity) => entity.relationships.length > 0)
     || spec.integrations.some((integration) => integration.mode !== 'NONE')
@@ -51,7 +54,7 @@ export function collectionExecutionErrors(spec: ProductSpec): string[] {
   if (keys.some((candidate) => !entity?.fields.some((field) => field.id === candidate))) reject('remove undeclared entity fields from the contract, or correct the canonical entity first');
   const implemented = new Set(spec.requirements.filter((requirement) => requirement.disposition === 'IMPLEMENT').map((requirement) => requirement.id));
   if (execution.requirement_ids.some((id) => !implemented.has(id))) reject('mapped requirement is not implemented');
-  const binding = execution.contract.state_binding;
+  const binding = contract.state_binding;
   if (spec.workflows.length > 1) reject('at most one workflow is supported', true);
   if (spec.workflows.length === 1 && !binding) reject('add a state_binding for the canonical workflow');
   if (binding) {
@@ -59,9 +62,9 @@ export function collectionExecutionErrors(spec: ProductSpec): string[] {
     if (!workflow || workflow.entity_id !== execution.entity_id) reject('state_binding references the wrong workflow');
     else {
       if (JSON.stringify(Object.keys(binding.states).sort()) !== JSON.stringify([...workflow.states].sort())) reject('state_binding must name every canonical workflow state exactly');
-      const transitions = execution.contract.actions.map((action) => action.transition_id).filter(Boolean);
+      const transitions = contract.actions.map((action) => action.transition_id).filter(Boolean);
       if (JSON.stringify([...transitions].sort()) !== JSON.stringify(workflow.transitions.map((transition) => transition.id).sort())) reject('actions must cover each canonical workflow transition exactly once');
-      if (execution.contract.actions.some((action) => !action.transition_id)) reject('every workflow action must bind to a canonical transition');
+      if (contract.actions.some((action) => !action.transition_id)) reject('every workflow action must bind to a canonical transition');
       const defaults = Object.fromEntries(Object.entries(hidden).map(([key, rule]) => [key, rule.initial]));
       const initial = binding.states[workflow.initial_state];
       if (!initial || !matchesGuard(initial, defaults) || Object.values(binding.states).filter((guard) => matchesGuard(guard, defaults)).length !== 1) reject('hidden defaults must select only the canonical initial workflow state');
@@ -70,7 +73,7 @@ export function collectionExecutionErrors(spec: ProductSpec): string[] {
       const references = [...Object.keys(guard.equals ?? {}), ...(guard.empty ?? []), ...(guard.present ?? [])];
       if (!references.length || references.some((field) => !Object.hasOwn(hidden, field))) reject('state guards must use declared hidden fields');
     }
-  } else if (execution.contract.actions.some((action) => action.transition_id)) reject('transition_id requires a canonical workflow binding');
+  } else if (contract.actions.some((action) => action.transition_id)) reject('transition_id requires a canonical workflow binding');
   try { compileCollection({ ...contract, storageKey: 'validation-only' }); }
   catch (error) { reject(error instanceof Error ? error.message : String(error)); }
   return errors;

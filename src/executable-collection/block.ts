@@ -15,6 +15,7 @@ export const EXECUTABLE_COLLECTION_BLOCK: CapabilityBlock = {
     const recordKeys = Object.fromEntries([
       ...contract.fields.map((field) => [field.key, field.key]),
       ...Object.keys(contract.hidden ?? {}).map((key) => [key, key]),
+      ...Object.entries(contract.canonicalFieldBindings ?? {}),
       ...(contract.canonicalIdentifier ? [[contract.canonicalIdentifier, 'id']] : []),
     ]);
     return [{ path: 'src/system/executable-collection.ts', content: readFileSync(new URL('./contract.ts', import.meta.url), 'utf8') }, {

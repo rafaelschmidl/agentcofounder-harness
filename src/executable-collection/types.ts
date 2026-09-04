@@ -2,7 +2,7 @@ import type { FlatCollectionContract } from './contract.js';
 
 export type CollectionExecution = { mode: 'custom'; reason: string } | {
   mode: 'compiled'; entity_id: string; requirement_ids: string[];
-  contract: Omit<FlatCollectionContract, 'storageKey' | 'canonicalIdentifier'>;
+  contract: Omit<FlatCollectionContract, 'storageKey' | 'canonicalIdentifier' | 'canonicalFieldBindings'>;
 };
 
 export function executableCollectionEnabled(): boolean {
