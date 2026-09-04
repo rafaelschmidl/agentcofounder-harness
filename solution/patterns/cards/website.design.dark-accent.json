@@ -1,0 +1,32 @@
+{
+  "id": "website.design.dark-accent@1.0.0",
+  "title": "Dark-accent visual direction",
+  "summary": "One saturated signature accent doing all the identity work against a near-black canvas, for apps that read as dark, moody, or nocturnal.",
+  "signals": ["dark", "dark mode", "night mode", "moody", "neon", "glow", "midnight", "nightlife"],
+  "capabilities": ["near-black canvas", "single saturated accent", "dark-mode palette"],
+  "defaults": [
+    "Hue: one saturated signature accent (Spotify green #1DB954 in the reference) reserved for primary actions, active states, and identity marks",
+    "Surface: near-black canvas (#121212 range) with slightly raised dark surfaces and near-white body text (#EAEAEA range)",
+    "Density: relaxed consumer spacing with generous media-first blocks",
+    "Keep the accent off large backgrounds: it marks one primary button, highlights, and state only"
+  ],
+  "risks": [
+    "Accent bleeding across large surfaces and losing its identity role",
+    "Low-contrast gray-on-dark body text failing 4.5:1",
+    "A second hue competing with the signature accent on the dark canvas"
+  ],
+  "verification": [
+    "Exactly one accent hue appears, only on primary actions and highlights",
+    "Body text reaches 4.5:1 contrast on the near-black surface",
+    "No pure #000000 or #FFFFFF values appear in the palette"
+  ],
+  "example_startups": [
+    { "name": "Spotify", "note": "Single signature green carrying all identity against a near-black canvas" }
+  ],
+  "visual_rules": [
+    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
+    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
+    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
+    "Never combine three or more saturated hues in one view"
+  ]
+}

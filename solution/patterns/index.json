@@ -14,6 +14,11 @@
     "cards/website.strategy.consumer-app.json",
     "cards/website.strategy.marketplace.json",
     "cards/website.strategy.community-content.json",
-    "cards/website.strategy.booking-appointments.json"
+    "cards/website.strategy.booking-appointments.json",
+    "cards/website.design.dark-accent.json",
+    "cards/website.design.warm-editorial.json",
+    "cards/website.design.bold-consumer.json",
+    "cards/website.design.calm-clinical.json",
+    "cards/website.design.restrained-functional.json"
   ]
 }

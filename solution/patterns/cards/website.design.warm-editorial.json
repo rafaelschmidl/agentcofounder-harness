@@ -1,0 +1,32 @@
+{
+  "id": "website.design.warm-editorial@1.0.0",
+  "title": "Warm editorial visual direction",
+  "summary": "A cream-and-charcoal editorial look with no competing brand hue, where every neutral is one charcoal base at varying opacities — warm, soft, human, storytelling.",
+  "signals": ["warm", "editorial", "cozy", "cream", "parchment", "charcoal", "soft", "storytelling", "handwritten"],
+  "capabilities": ["cream page", "charcoal-opacity neutral scale", "editorial whitespace"],
+  "defaults": [
+    "Hue: warm near-black charcoal (#1C1C1C) as the only accent — no bright brand hue at all",
+    "Surface: cream/parchment page (#F7F4ED range) with one warm border tone (#ECEAE4 range)",
+    "Density: airy editorial rhythm — generous whitespace, reading-first typography",
+    "Build the neutral scale from the charcoal base at varying opacities (e.g., 4%, 40%, 82%, 100%) instead of separate grays"
+  ],
+  "risks": [
+    "Introducing a bright brand hue that breaks the tonal harmony",
+    "Mid-gray body text on cream failing 4.5:1",
+    "Dense dashboard feel where the direction calls for editorial calm"
+  ],
+  "verification": [
+    "All neutrals derive from one charcoal base hue at varying opacities",
+    "Body text reaches 4.5:1 contrast on the cream surface",
+    "No pure #000000 or #FFFFFF values and no second saturated hue appear"
+  ],
+  "example_startups": [
+    { "name": "Lovable", "note": "Cream editorial neutrals: one charcoal base rendered at varying opacities instead of a gray scale" }
+  ],
+  "visual_rules": [
+    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
+    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
+    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
+    "Never combine three or more saturated hues in one view"
+  ]
+}

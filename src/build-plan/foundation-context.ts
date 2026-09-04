@@ -77,6 +77,7 @@ export function foundationDesignContext(styles = BASE_UI_STYLES): string {
   return [
     "## Foundation design API — shipped defaults, not a required appearance",
     "Unlayered src/product/styles.css overrides @layer foundation, including its mobile rules. Set a coherent :root palette (page, surfaces, ink, muted, lines, accent and status colors), choose system font stacks for body/headings, and change layout selectors to serve this product. Accent changes alone retain the default theme. Preserve contrast, focus, control targets and reduced-motion behavior when overriding.",
+    "Shared visual rules: one signature accent used sparingly; neutrals from a single base hue at varying opacities, never pure #000000 or #FFFFFF; body text at least 4.5:1 contrast, buttons and CTAs at least 3:1; never three or more competing saturated hues. Realize a spec visual direction by overriding these :root variables; when the spec carries no visual direction, keep this default palette unchanged.",
     "AppShell supplies a header with an initial-letter mark and a main region; it is optional. workspace-layout is a main/aside arrangement, not a mandatory page. record-list/record-row form a list with item actions; record-grid lays out whole records as tiles, not the fields within one row. form-grid arranges form fields. Use custom classes where these arrangements do not fit.",
     "Default values and responsive overrides (all derived from the installed foundation):",
     "```css",
