@@ -141,6 +141,7 @@ describe("app verification", () => {
 
     expect(result.passed).toBe(false);
     expect(result.checks.map((entry) => entry.result)).toEqual(["failed", "passed", "passed"]);
+    expect(result.readiness).toEqual({ complete: true, build: true, startup: true });
   }, 45_000);
 
   it("never accepts HTTP from a server that already owned the configured port", async () => {

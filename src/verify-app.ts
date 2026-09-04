@@ -416,6 +416,7 @@ async function hasPassingVitestReport(reportPath: string): Promise<boolean> {
 export function unavailableAppVerification(reason: string): AppVerification {
   return {
     passed: false,
+    readiness: { complete: false, build: false, startup: false },
     checks: [
       testRun("vitest run", `App tests were not run: ${reason}`, "failed"),
       testRun("npm run build", `Production build was not run: ${reason}`, "failed"),
@@ -513,11 +514,15 @@ export async function verifyGeneratedApp(
       await safeWriteLog(path.join(artifactDirectory, "journey-test-results.json"), `${JSON.stringify(journeys, null, 2)}\n`);
     }
 
-    return { passed: checks.every((entry) => entry.result === "passed"), checks, journeys };
+    return {
+      passed: checks.every((entry) => entry.result === "passed"), checks, journeys,
+      readiness: { complete: true, build: build.exitCode === 0, startup: serverPassed },
+    };
   } catch (error) {
     await safeWriteLog(path.join(artifactDirectory, "app-verification-error.log"), `${String(error)}\n`);
     return {
       passed: false,
+      readiness: { complete: true, build: false, startup: false },
       checks: [
         testRun(commands.test.display, "App verification encountered an internal error", "failed"),
         testRun(commands.build, "Production build could not be verified", "failed"),

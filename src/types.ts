@@ -59,6 +59,8 @@ export interface AppVerification {
   checks: TestRun[];
   journeys?: JourneyVerification[];
   incompleteFiles?: string[];
+  /** Internal source-checkpoint eligibility; this is not product acceptance. */
+  readiness?: { complete: boolean; build: boolean; startup: boolean };
 }
 
 export interface JourneyVerification {

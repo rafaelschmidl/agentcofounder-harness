@@ -38,6 +38,7 @@ import type { AppVerification, RunResult } from "./types.js";
 import type { BuildPlan } from "./build-plan/types.js";
 import { validateResultObject } from "./validate-result.js";
 import { captureRequiredArtifacts, portHasListener, unavailableAppVerification, verifyGeneratedApp } from "./verify-app.js";
+import { captureSourceCheckpoint, restoreSourceCheckpoint, sourceIsReady, type SourceCheckpoint } from "./source-checkpoint.js";
 
 interface Arguments {
   ideaFile: string;
@@ -375,6 +376,8 @@ async function main(): Promise<void> {
   await trace.record("linking", "completed", "Deterministic routes, exports, and entry points were linked.");
 
   let verification = unavailableAppVerification("Pi did not complete before the run deadline");
+  let latestReadySource: SourceCheckpoint | undefined;
+  let latestSourceAttempt = 0;
   // An interrupted response can leave repairable files. Verification, not process exit alone, diagnoses them.
   if (!builder.timedOut) {
     const diagnosisKeys = new Set<string>();
@@ -389,6 +392,9 @@ async function main(): Promise<void> {
         requiredArtifacts,
         journeys: spec.acceptance_journeys,
       });
+      latestReadySource = await captureSourceCheckpoint(
+        outputDirectory, path.join(artifactDirectory, "checkpoints"), plan.file_ownership, attempt, verification,
+      ) ?? latestReadySource;
       await trace.record(
         "verification",
         verification.passed ? "completed" : "failed",
@@ -448,6 +454,11 @@ async function main(): Promise<void> {
         });
         break;
       }
+      if (runDeadline - Date.now() < 1_000) {
+        runTimedOut = true;
+        await trace.record("repair", "failed", "No run time remained for diagnosed repair.");
+        break;
+      }
 
       const repairAttempt = attempt + 1;
       const repairDirectory = path.join(artifactDirectory, "repairs", `attempt-${repairAttempt}`);
@@ -470,6 +481,7 @@ async function main(): Promise<void> {
         remaining_model_calls: remainingCalls,
       });
       // A repair may change previously passing behavior before failing or timing out.
+      latestSourceAttempt = repairAttempt;
       verification = unavailableAppVerification(`Repair attempt ${repairAttempt} has not been verified`);
       const repair = await runPi(
         buildRepairPiArguments(
@@ -515,6 +527,17 @@ async function main(): Promise<void> {
       await trace.record("linking", "completed", `Relinked after repair attempt ${repairAttempt}.`);
       if (repair.timedOut) break;
     }
+  }
+
+  if (latestReadySource && !sourceIsReady(verification)) {
+    const restoration = await restoreSourceCheckpoint(
+      outputDirectory, path.join(artifactDirectory, "repair-regressions", `attempt-${latestSourceAttempt}`),
+      latestReadySource, latestSourceAttempt, verification,
+    );
+    verification = restoration.verification;
+    await trace.record("repair", "failed", restoration.diagnostic, {
+      checkpoint_attempt: latestReadySource.attempt, latest_attempt: latestSourceAttempt, restored: restoration.restored,
+    });
   }
 
   const portReclamation = await auditAppPortAfterPi(args.verificationPort, outputDirectory, appPortHadListenerBeforePi);
