@@ -1,0 +1,32 @@
+{
+  "id": "website.design.restrained-functional@1.0.0",
+  "title": "Restrained functional visual direction",
+  "summary": "A sober, utilitarian tool look: one restrained blue pair for identity and action, with saturated color reserved strictly for functional state signaling.",
+  "signals": ["functional", "utilitarian", "restrained", "serious", "professional", "pragmatic", "sober", "no-nonsense"],
+  "capabilities": ["restrained blue pair", "status-only color", "compact utilitarian density"],
+  "defaults": [
+    "Hue: one restrained primary blue (#294D73) and dark blue (#192E45) pair carrying identity and actions; reserve green and red strictly for status",
+    "Surface: plain, muted, unornamented light background with calm neutral tones",
+    "Density: compact utilitarian density — clear rows, tight controls, information over decoration",
+    "Saturated colors appear only where they signal state: connected, active, error, success"
+  ],
+  "risks": [
+    "Decorative color creeping into a tool-like surface",
+    "The restrained blue pair drifting toward saturated marketing hues",
+    "Muted body text dropping below 4.5:1 contrast"
+  ],
+  "verification": [
+    "Saturated color appears only on actions and functional status",
+    "Body text reaches 4.5:1 and status color pairs 3:1 contrast",
+    "Neutrals avoid pure #000000 and #FFFFFF"
+  ],
+  "example_startups": [
+    { "name": "Mullvad VPN", "note": "Restrained blue/dark-blue pair where green and red exist only to signal connection state" }
+  ],
+  "visual_rules": [
+    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
+    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
+    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
+    "Never combine three or more saturated hues in one view"
+  ]
+}

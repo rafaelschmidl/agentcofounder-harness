@@ -24,7 +24,11 @@ Every implemented requirement must appear in at least one acceptance journey's `
 
 Make exactly one compact `retrieve_patterns` call with a limit no greater than 6 before drafting. Only include versioned IDs actually returned by that call in `selected_patterns`. A pattern is supporting product knowledge, not permission to add unrelated scope.
 
-Retrieved `website.strategy.*` cards capture how comparable startup sites are built: their site goals, typical views, and common components. When a card fits the idea, use it as an anchor for `product.goals` framing, view naming and purposes, and component vocabulary, and record its ID in `selected_patterns`. It is an anchor, not a blueprint: keep only what fits this idea, never force a category or add views and features the idea does not imply, and ignore cards that do not fit.
+Retrieved `website.strategy.*` cards capture how comparable startup sites are built: their site goals, typical views, and common components. Retrieved `website.design.*` family cards capture a curated visual direction — hue, surface, density — grounded in a named reference company; a family shapes only `product.experience.visual_direction`, never goals or view structure.
+
+Apply this match-confidence policy to every retrieved card using its `matched_terms`. Two or more distinct matched signal terms make the card an anchor for what it covers: strategy cards anchor goals, views, and composition; design families anchor the visual direction. Record anchored card IDs in `selected_patterns`. Exactly one distinct matched term is a weak hint, never an anchor: verify the card genuinely fits this idea before using any of its guidance, and keep it unselected when the fit is doubtful. When no retrieved card fits the idea, fall back generically: derive goals, views, and composition from the idea's own workflows as you would without the library, leave the visual direction to the platform defaults without inventing one, and cite nothing in `selected_patterns`.
+
+A card is an anchor, not a blueprint: keep only what fits this idea, never force a category or visual direction onto an idea it does not fit, never add views and features the idea does not imply, and ignore cards that do not fit.
 
 The compact draft contains the semantic ProductSpec v0.1 fields, with the deterministic fields above omitted:
 

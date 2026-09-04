@@ -1,0 +1,32 @@
+{
+  "id": "website.design.calm-clinical@1.0.0",
+  "title": "Calm clinical visual direction",
+  "summary": "A clean, precise clinical monochrome softened by sparse warm secondary tones — calm, airy, and trustworthy rather than sterile or dashboard-like.",
+  "signals": ["clinical", "calm", "clean", "minimal", "precise", "serene", "airy", "quiet", "hygienic"],
+  "capabilities": ["clinical monochrome", "warm secondary tones", "spacious hierarchy"],
+  "defaults": [
+    "Hue: clinical monochrome base softened by at most two warm secondary tones (soft yellow, beige, brown, or moss green) used sparingly",
+    "Surface: bright white-adjacent monochrome surface (#FAFAF7 range), never pure white",
+    "Density: spacious scanning rhythm — generous gaps, unhurried hierarchy, clear breathing room",
+    "Let the warm secondaries signpost sections and supporting states; the primary action stays monochrome-backed"
+  ],
+  "risks": [
+    "Cold gray-on-white body text failing 4.5:1",
+    "Secondary tones multiplying into three or more competing hues",
+    "Sterility where the direction calls for warm, calm trust"
+  ],
+  "verification": [
+    "At most two warm secondary tones accompany the monochrome base",
+    "Body text reaches 4.5:1 contrast on the clinical surface",
+    "No pure #000000/#FFFFFF values and no three-plus saturated hues appear"
+  ],
+  "example_startups": [
+    { "name": "Neko Health", "note": "Warm optimistic secondaries (yellow, beige, brown, green) softening clinical monochrome into trust and calm" }
+  ],
+  "visual_rules": [
+    "Use exactly one signature accent color, sparingly, for identity and primary CTAs",
+    "Derive all neutral tones from one base hue at varying opacities; never use pure #000000 or #FFFFFF",
+    "Keep body text contrast at least 4.5:1 and button or CTA contrast at least 3:1 against adjacent colors",
+    "Never combine three or more saturated hues in one view"
+  ]
+}

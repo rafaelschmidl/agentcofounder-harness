@@ -28,8 +28,7 @@ describe("offline pattern catalogue", () => {
     expect(retrievePatterns("astrophysics telescope", 3).selected).toEqual([]);
   });
 
-  it("keeps website strategy knowledge cards complete and shaped", () => {
-    const cards = loadPatternCatalog();
+  it("keeps website strategy knowledge cards complete and shaped", () => {    const cards = loadPatternCatalog();
     const websiteCards = cards.filter((card) => card.id.startsWith("website.strategy."));
     expect(websiteCards.length).toBeGreaterThanOrEqual(5);
     for (const card of websiteCards) {
@@ -90,6 +89,59 @@ describe("offline pattern catalogue", () => {
   it("keeps the default top-N result bound intact", () => {
     const result = retrievePatterns("shop product stock cart checkout payment declined order total", 4);
     expect(result.selected.length).toBeLessThanOrEqual(4);
+  });
+
+  it("keeps design family cards complete and shaped", () => {
+    const cards = loadPatternCatalog();
+    const designCards = cards.filter((card) => card.id.startsWith("website.design."));
+    expect(designCards.length).toBeGreaterThanOrEqual(4);
+    for (const card of designCards) {
+      expect(card.signals.length).toBeGreaterThan(0);
+      expect(card.signals.length).toBeLessThanOrEqual(15);
+      expect(card.defaults?.length).toBeGreaterThan(0);
+      expect(card.example_startups?.length).toBeGreaterThanOrEqual(1);
+      expect(card.example_startups).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: expect.any(String), note: expect.any(String) })]),
+      );
+      expect(card.visual_rules?.length).toBeGreaterThanOrEqual(4);
+    }
+    const ruleTexts = new Set(designCards.map((card) => JSON.stringify(card.visual_rules)));
+    expect(ruleTexts.size).toBe(1);
+    const signalWords = new Set(designCards.flatMap((card) => card.signals).flatMap((signal) => signal.split(" ")));
+    for (const categoryWord of ["shop", "store", "marketplace", "booking", "saas", "crm", "commerce"]) {
+      expect(signalWords.has(categoryWord)).toBe(false);
+    }
+  });
+
+  it("returns at most one design family card when an idea matches several", () => {
+    const selectedIds = retrievePatterns("a dark moody minimal clean habit tracker vibe", 6).selected.map(
+      (result) => result.card.id,
+    );
+    const designIds = selectedIds.filter((id) => id.startsWith("website.design."));
+    expect(designIds.length).toBe(1);
+  });
+
+  it("keeps the strategy card in top-N alongside at most one design family", () => {
+    const selectedIds = retrievePatterns(
+      "a warm cozy online storefront selling handmade goods with a product catalogue and cart checkout",
+      6,
+    ).selected.map((result) => result.card.id);
+    expect(selectedIds).toContain("website.strategy.commerce@1.0.0");
+    expect(selectedIds.filter((id) => id.startsWith("website.design.")).length).toBeLessThanOrEqual(1);
+  });
+
+  it("returns no website cards for unrelated ideas", () => {
+    const selectedIds = retrievePatterns("recipe meal planner with weekly grocery lists", 8).selected.map(
+      (result) => result.card.id,
+    );
+    expect(selectedIds.filter((id) => id.startsWith("website."))).toEqual([]);
+  });
+
+  it("returns the expected strategy card for a strong-match idea", () => {
+    const selectedIds = retrievePatterns("online storefront selling handmade goods with a product catalogue and cart checkout", 6).selected.map(
+      (result) => result.card.id,
+    );
+    expect(selectedIds).toContain("website.strategy.commerce@1.0.0");
   });
 
   it("records retrieved cards as runner-readable JSONL evidence", async () => {
