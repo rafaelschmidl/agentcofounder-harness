@@ -14,4 +14,4 @@ Write concise Vitest/Testing Library journeys through App for every verification
 
 For normal journeys, create records through the visible UI before editing, filtering or reloading. Do not assume a storage serialization shape: raw arrays are not the compiled repository's saved format. Deliberately malformed storage belongs only in recovery tests. Await asynchronous interaction helpers; a failed-save test must actually submit a valid draft and distinguish its save error from an unrelated load error.
 
-Write only the three required AGENT files. Deterministic checks and the existing repair loop provide failure evidence.
+Render the active editor once. A workflow action should open one form, not duplicate it in both a row and the surrounding page. Write only the three required AGENT files. Deterministic checks and the existing repair loop provide failure evidence.
