@@ -147,7 +147,7 @@ export async function loadBuilderPrompts(
 }
 
 function materializedInterfaceContext(relativePath: string, source: string): string {
-  if (relativePath !== "src/system/record-form.tsx") return source;
+  if (!["src/system/record-form.tsx", "src/system/collection-controller.tsx"].includes(relativePath)) return source;
   // Derive the API from the shipped implementation so optional helper guidance
   // cannot silently omit an export or lag a changed prop signature.
   const declaration = ts.transpileDeclaration(source, {

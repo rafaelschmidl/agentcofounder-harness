@@ -68,6 +68,7 @@ describe("deterministic BuildPlan compiler", () => {
       "data.local-repository",
       "domain.collection",
       "ui.accessible-shell",
+      "ui.collection-controller",
       "verification.product",
     ]);
     expect(validateBuildPlan(plan, spec)).toEqual({ valid: true, errors: [], plan });
@@ -87,12 +88,22 @@ describe("deterministic BuildPlan compiler", () => {
       "verification.product",
     ]);
     expect(validateBuildPlan(plan, spec).valid).toBe(true);
+    expect(plan.file_ownership.some((file) => file.path === "src/system/collection-controller.tsx")).toBe(false);
   });
 
   it("selects an explicit state-machine block for workflow products", () => {
     const spec = workflowSpec();
     const plan = compileProductSpec(spec);
     expect(plan.blocks.map((block) => block.id)).toContain("domain.workflow");
+    expect(validateBuildPlan(plan, spec).valid).toBe(true);
+  });
+
+  it("does not introduce local storage or collection controller imports for an ephemeral product", () => {
+    const spec = validProductSpec();
+    spec.persistence.mode = "NONE";
+    const plan = compileProductSpec(spec);
+    expect(plan.blocks.some((block) => block.id === "ui.collection-controller")).toBe(false);
+    expect(plan.blocks.some((block) => block.id === "data.local-repository")).toBe(false);
     expect(validateBuildPlan(plan, spec).valid).toBe(true);
   });
 
@@ -250,6 +261,29 @@ describe("deterministic BuildPlan compiler", () => {
     expect(helperContext).toContain("futureOption?: string");
     expect(helperContext).toContain("declare function futureHelper(value: string): string");
     expect(helperContext).not.toContain("setValues");
+    expect(helperContext).not.toContain("value.trim()");
+  });
+
+  it("derives collection controller declarations from actual runtime exports and definition signatures", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "collection-controller-api-"));
+    temporaryDirectories.push(directory);
+    const spec = validProductSpec();
+    const plan = compileProductSpec(spec);
+    await writeFile(path.join(directory, "AGENTS.md"), "# Generated app contract\n", "utf8");
+    await materializeBuildPlan(plan, spec, directory);
+    const helperPath = path.join(directory, "src/system/collection-controller.tsx");
+    const source = await readFile(helperPath, "utf8");
+    await writeFile(helperPath, source.replace("storageKey: string;", "storageKey: string;\n  futureOption?: string;")
+      + "\nexport function futureCollectionHelper(value: string): string { return value.trim(); }\n", "utf8");
+    const prompts = await loadBuilderPrompts(directory, plan);
+    const helperContext = prompts.appContext.split("### src/system/collection-controller.tsx")[1]?.split("### ")[0];
+    expect(helperContext).toContain("CollectionDefinition");
+    expect(helperContext).toContain("declare function useCollection");
+    expect(helperContext).toContain("declare function CollectionEditor");
+    expect(helperContext).toContain("declare function prepareCollectionAction");
+    expect(helperContext).toContain("futureOption?: string");
+    expect(helperContext).toContain("declare function futureCollectionHelper(value: string): string");
+    expect(helperContext).not.toContain("canonical.current");
     expect(helperContext).not.toContain("value.trim()");
   });
 

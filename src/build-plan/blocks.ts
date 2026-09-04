@@ -1,5 +1,6 @@
 import type { CapabilityBlock, MaterializedFile } from "./types.js";
 import { RECORD_FORM_SOURCE } from "./record-form.js";
+import { COLLECTION_CONTROLLER_SOURCE } from "./collection-controller.js";
 
 const objectSchema = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: "object",
@@ -56,6 +57,7 @@ export class LocalStorageRepository<T> implements Repository<T> {
     private readonly version: number,
     private readonly fallback: () => T,
     private readonly isValid: (value: unknown) => value is T,
+    private readonly onRecovery?: () => void,
   ) {}
 
   load(): T {
@@ -77,6 +79,7 @@ export class LocalStorageRepository<T> implements Repository<T> {
   }
 
   private recover(): T {
+    this.onRecovery?.();
     const value = this.fallback();
     try {
       this.save(value);
@@ -355,7 +358,7 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
   },
   {
     id: "data.local-repository",
-    version: "1.0.0",
+    version: "1.1.0",
     config_schema: objectSchema(
       { storage_key: { type: "string", minLength: 1 }, schema_version: { type: "integer", minimum: 1 } },
       ["storage_key", "schema_version"],
@@ -433,6 +436,18 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
     exported_interfaces: ["AppShell", "SectionHeader", "FieldError", "EmptyState", "StatusMessage", "RecordForm", "RecordField", "FormResult", "RecordFormProps"],
     materialize: accessibleShellFiles,
     checks: ["accessible names", "keyboard operation", "responsive layout"],
+  },
+  {
+    id: "ui.collection-controller",
+    version: "1.0.0",
+    config_schema: objectSchema({}, []),
+    capabilities: ["optional-local-collection-controller", "atomic-save-feedback", "domain-action-forms"],
+    dependencies: ["data.local-repository", "domain.collection", "ui.accessible-shell"],
+    conflicts: [],
+    owned_files: ["src/system/collection-controller.tsx"],
+    exported_interfaces: ["CollectionValues", "CollectionErrors", "CollectionItem", "CollectionActionResult", "CollectionAction", "CollectionDefinition", "CollectionEditorState", "CollectionController", "prepareCollectionAction", "useCollection", "CollectionEditor"],
+    materialize: () => [{ path: "src/system/collection-controller.tsx", content: COLLECTION_CONTROLLER_SOURCE }],
+    checks: ["collection save failure preserves state and draft", "action guards and edit preservation", "reload and recovery feedback"],
   },
   {
     id: "verification.product",

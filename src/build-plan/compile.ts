@@ -11,6 +11,7 @@ const BLOCK_ORDER = [
   "domain.transaction",
   "integration.payment-stub",
   "ui.accessible-shell",
+  "ui.collection-controller",
   "verification.product",
 ] as const;
 
@@ -55,6 +56,12 @@ function selectedBlockIds(spec: ProductSpec): Set<string> {
   ) {
     selected.add("integration.payment-stub");
   }
+  // Offer shared behavior for local collections without prescribing their UI.
+  // Transactional products retain their explicit domain/state composition.
+  if (selected.has("data.local-repository") && selected.has("domain.collection") &&
+    !selected.has("domain.transaction") && !selected.has("integration.payment-stub")) {
+    selected.add("ui.collection-controller");
+  }
 
   const addDependencies = (blockId: string, visiting = new Set<string>()): void => {
     if (visiting.has(blockId)) throw new Error(`Capability dependency cycle at ${blockId}`);
@@ -86,6 +93,7 @@ function blockConfig(blockId: string, spec: ProductSpec): Record<string, unknown
     case "integration.payment-stub":
       return { modes: ["succeed", "decline"] };
     case "ui.accessible-shell":
+    case "ui.collection-controller":
       return {};
     case "verification.product":
       return { journey_ids: spec.acceptance_journeys.map((journey) => journey.id).sort() };
