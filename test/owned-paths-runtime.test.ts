@@ -18,6 +18,7 @@ async function runFixture(options: {
   permittedFiles?: string[];
   repair?: boolean;
   read?: boolean;
+  delayedReadMs?: number;
   prepare?: (app: string) => Promise<void>;
   response: (request: number, app: string) => Promise<Response> | Response;
 }) {
@@ -34,6 +35,27 @@ async function runFixture(options: {
   const ownershipFile = path.join(directory, "file_ownership.json");
   await writeFile(ownershipFile, JSON.stringify(ownership));
   await options.prepare?.(app);
+  // Deliberately skew the wrapper's first observation. Without native sequential
+  // execution, a later write can enter Pi's file queue before the earlier edit.
+  const readDelayModule = path.join(directory, "delay-read.mjs");
+  if (options.delayedReadMs !== undefined) {
+    await writeFile(readDelayModule, `
+      import fs from "node:fs/promises";
+      import { realpathSync } from "node:fs";
+      import { syncBuiltinESMExports } from "node:module";
+      const target = realpathSync(${JSON.stringify(path.join(app, "app.ts"))});
+      const readFile = fs.readFile;
+      let delayed = false;
+      fs.readFile = async function(file, ...args) {
+        if (!delayed && String(file) === target) {
+          delayed = true;
+          await new Promise(resolve => setTimeout(resolve, ${options.delayedReadMs}));
+        }
+        return readFile.call(this, file, ...args);
+      };
+      syncBuiltinESMExports();
+    `);
+  }
   let requests = 0;
   const requestBodies: { messages: { role: string; content: unknown }[] }[] = [];
   const serverErrors: unknown[] = [];
@@ -91,6 +113,7 @@ async function runFixture(options: {
       env: {
         PATH: process.env.PATH, HOME: directory, PI_CODING_AGENT_DIR: state, PI_OFFLINE: "1",
         SYSTEM_V0_OWNERSHIP_FILE: ownershipFile,
+        ...(options.delayedReadMs !== undefined ? { NODE_OPTIONS: `--import=${readDelayModule}` } : {}),
         ...(options.repair ? { SYSTEM_V0_PERMITTED_PATHS: JSON.stringify(options.permittedFiles ?? options.files) } : {}),
       },
     });
@@ -173,9 +196,9 @@ it("returns a substantive repair batch to verification after all files and same-
   expect(result.events.some((event) => event.toolName === "finish_repair")).toBe(false);
 }, 20_000);
 
-it("repairs absolute and aliased paths to the permitted file while retaining other ownership restrictions", async () => {
+it.each([0, 40, 120])("repairs aliases in call order despite a %ims delayed read, retaining ownership restrictions", async (delayedReadMs) => {
   const result = await runFixture({
-    files: ["app.ts", "styles.css"], permittedFiles: ["app.ts"], repair: true,
+    files: ["app.ts", "styles.css"], permittedFiles: ["app.ts"], repair: true, delayedReadMs,
     prepare: async (app) => {
       await writeFile(path.join(app, "app.ts"), "original");
       await writeFile(path.join(app, "styles.css"), "unchanged style");
@@ -192,6 +215,8 @@ it("repairs absolute and aliased paths to the permitted file while retaining oth
   expect(result.requests, JSON.stringify(result.events.filter((event) => event.type === "tool_execution_end"))).toBe(2);
   expect(result.content).toMatchObject({ "app.ts": "absolute correction", "styles.css": "unchanged style", "system.ts": "immutable foundation" });
   expect(result.events.filter((event) => event.type === "tool_execution_end" && event.isError)).toHaveLength(2);
+  expect(result.events.filter((event) => event.type === "tool_execution_end" && !event.isError)
+    .map((event) => event.toolCallId)).toEqual(["call-2-0", "call-2-1"]);
 }, 20_000);
 
 it("does not hand back for noop writes, refused writes, failed edits, or reads without a substantive mutation", async () => {

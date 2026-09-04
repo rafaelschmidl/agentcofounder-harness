@@ -11,6 +11,11 @@ export default function repairCompletion(pi: ExtensionAPI) {
   function withHandoff<TParameters extends TSchema, TDetails>(tool: ToolDefinition<TParameters, TDetails>) {
     return {
       ...tool,
+      // The before/after observation is part of the mutation contract. Pi's
+      // native runtime otherwise starts every call concurrently, so an async
+      // observation could let a later alias of this file enter the native
+      // mutation queue first and reverse the model's edit/write order.
+      executionMode: "sequential" as const,
       async execute(...args: Parameters<typeof tool.execute>) {
         const file = canonicalFilePath(path.resolve(process.cwd(), String((args[1] as { path: string }).path)));
         // Native mutations queue by path. Equivalent aliases must share the
