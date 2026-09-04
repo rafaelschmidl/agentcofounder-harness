@@ -5,6 +5,17 @@ import { validateProductSpec } from '../src/product-spec/validate.js';
 import { BOOK_IDEA, SAAS_IDEA, publicCollectionSpec } from './fixtures/executable-collection.js';
 
 describe('canonical collection field bindings', () => {
+  it.each(['editable', 'hidden'] as const)('rejects %s keys that reuse a generated identifier before inferring aliases', (placement) => {
+    const spec = publicCollectionSpec('book');
+    const reusedKey = placement === 'editable' ? 'title' : 'borrower';
+    spec.entities[0]!.fields.find((field) => field.id === reusedKey)!.id = `canonical_${reusedKey}`;
+    spec.entities[0]!.fields.push({ id: reusedKey, name: 'Generated identifier', type: 'identifier', required: true, values: [], validation: [] });
+    const original = structuredClone(spec);
+    expect(validateProductSpec(spec, BOOK_IDEA).errors.join(' ')).toContain(`generated identifier ${reusedKey} cannot be an editable or hidden field`);
+    expect(() => executableContract(spec)).toThrow(`generated identifier ${reusedKey}`);
+    expect(spec).toEqual(original);
+  });
+
   it('lowers exact field names across state predicates and action input without mutating canonical evidence', () => {
     const spec = publicCollectionSpec('book');
     for (const field of spec.entities[0]!.fields) field.id = `canonical_${field.id}`;

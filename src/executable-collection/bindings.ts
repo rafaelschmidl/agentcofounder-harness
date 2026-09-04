@@ -14,6 +14,9 @@ export function bindCollectionFields(draft: Draft, canonical: EntityField[]): Bo
   const bindings = new Map<string, string>();
   const claimed = new Map<string, string>();
   function bind(key: string, label?: string, hiddenChoices?: string[]) {
+    if (canonical.some((field) => field.id === key && field.type === 'identifier')) {
+      throw new Error(`generated identifier ${key} cannot be an editable or hidden field`);
+    }
     const exact = fields.find((field) => field.id === key);
     const names = new Set([key, ...(label ? [label] : [])].map(comparableName));
     let candidates = exact ? [exact] : fields.filter((field) => names.has(comparableName(field.name)));
