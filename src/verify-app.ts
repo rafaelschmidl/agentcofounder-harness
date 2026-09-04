@@ -1,9 +1,14 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { lstat, readFile, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { signalProcessTree, usesDetachedProcessGroup } from "./process-tree.js";
-import type { AppVerification, TestRun } from "./types.js";
+import type { AppVerification, JourneyVerification, TestRun } from "./types.js";
+
+export interface RequiredArtifact {
+  path: string;
+  seed: string;
+}
 
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 
@@ -28,6 +33,70 @@ export interface VerificationOptions {
   npmCommand?: string;
   vitestCommand?: string;
   port?: number;
+  requiredArtifacts?: readonly RequiredArtifact[];
+  journeys?: readonly { id: string }[];
+}
+
+function substantiveSource(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "").replace(/\s+/gu, "");
+}
+
+export async function captureRequiredArtifacts(appDirectory: string, paths: readonly string[]): Promise<RequiredArtifact[]> {
+  return await Promise.all(paths.map(async (file) => ({
+    path: file,
+    seed: await readFile(path.join(appDirectory, file), "utf8"),
+  })));
+}
+
+export async function incompleteRequiredArtifacts(
+  appDirectory: string,
+  artifacts: readonly RequiredArtifact[],
+): Promise<string[]> {
+  const incomplete = await Promise.all(artifacts.map(async (artifact) => {
+    try {
+      const file = path.join(appDirectory, artifact.path);
+      if (!(await lstat(file)).isFile()) return artifact.path;
+      const source = substantiveSource(await readFile(file, "utf8"));
+      return source.length === 0 || source === substantiveSource(artifact.seed) ? artifact.path : undefined;
+    } catch {
+      return artifact.path;
+    }
+  }));
+  return incomplete.filter((file): file is string => file !== undefined).sort();
+}
+
+function object(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : undefined;
+}
+
+/** Tags connect declared journeys to executed tests; they do not establish independent product fidelity. */
+export function reconcileJourneyTests(report: unknown, journeys: readonly { id: string }[]): JourneyVerification[] {
+  const suites = object(report)?.testResults;
+  const assertions = (Array.isArray(suites) ? suites : []).flatMap((suite: unknown) => {
+    const results = object(suite)?.assertionResults;
+    return Array.isArray(results) ? results : [];
+  }).flatMap((assertion: unknown) => {
+    const value = object(assertion);
+    if (!value) return [];
+    const ancestors = Array.isArray(value.ancestorTitles) ? value.ancestorTitles.filter((title) => typeof title === "string") : [];
+    const name = typeof value.fullName === "string" ? value.fullName
+      : [...ancestors, typeof value.title === "string" ? value.title : ""].join(" ");
+    return [{ name, status: value.status }];
+  });
+  return journeys.map(({ id }) => {
+    const matching = assertions.filter((assertion) => assertion.name.includes(`[${id}]`));
+    const passed = matching.length > 0 && matching.every((assertion) => assertion.status === "passed");
+    return {
+      id,
+      result: passed ? "passed" : "failed",
+      testNames: matching.map((assertion) => assertion.name),
+      diagnostic: matching.length === 0
+        ? `No executed test was reported with the exact [${id}] tag in its name.`
+        : passed
+          ? `${matching.length} tagged generated test(s) passed.`
+          : "One or more tagged tests failed, were skipped, or did not finish.",
+    };
+  });
 }
 
 interface CapturedOutput {
@@ -360,6 +429,18 @@ export async function verifyGeneratedApp(
   artifactDirectory: string,
   options: VerificationOptions = {},
 ): Promise<AppVerification> {
+  const incompleteFiles = await incompleteRequiredArtifacts(appDirectory, options.requiredArtifacts ?? []);
+  if (incompleteFiles.length > 0) {
+    const reason = `Missing, empty, or unchanged seed files: ${incompleteFiles.join(", ")}`;
+    await safeWriteLog(path.join(artifactDirectory, "app-artifacts.log"), `${reason}\n`);
+    const unavailable = unavailableAppVerification(reason);
+    return {
+      ...unavailable,
+      checks: [{ command: "harness:required-artifacts", journey: reason, result: "failed" }, ...unavailable.checks],
+      incompleteFiles,
+      journeys: reconcileJourneyTests(undefined, options.journeys ?? []),
+    };
+  }
   const commandTimeoutMs = options.commandTimeoutMs ?? 120_000;
   const displayRoot = options.displayRoot ?? process.cwd();
   const serverTimeoutMs = options.serverTimeoutMs ?? 20_000;
@@ -380,6 +461,13 @@ export async function verifyGeneratedApp(
       commandTimeoutMs,
     );
     const testsPassed = test.exitCode === 0 && (await hasPassingVitestReport(testReportPath));
+    let testReport: unknown;
+    try {
+      testReport = JSON.parse(await readFile(testReportPath, "utf8")) as unknown;
+    } catch {
+      // Missing or malformed reports cannot establish journey coverage.
+    }
+    const journeys = reconcileJourneyTests(testReport, options.journeys ?? []);
     const build = await runLoggedCommand(
       npmCommand,
       ["run", "build"],
@@ -413,7 +501,19 @@ export async function verifyGeneratedApp(
       ),
     ];
 
-    return { passed: checks.every((entry) => entry.result === "passed"), checks };
+    if (options.requiredArtifacts && options.requiredArtifacts.length > 0) {
+      checks.push(testRun("harness:required-artifacts", "Every required product file replaced its seed with substantive content", "passed"));
+    }
+    if (options.journeys) {
+      checks.push(testRun(
+        "harness:journey-coverage",
+        "Every declared journey has passing generated tests with its exact journey ID tag",
+        journeys.length > 0 && journeys.every((journey) => journey.result === "passed") ? "passed" : "failed",
+      ));
+      await safeWriteLog(path.join(artifactDirectory, "journey-test-results.json"), `${JSON.stringify(journeys, null, 2)}\n`);
+    }
+
+    return { passed: checks.every((entry) => entry.result === "passed"), checks, journeys };
   } catch (error) {
     await safeWriteLog(path.join(artifactDirectory, "app-verification-error.log"), `${String(error)}\n`);
     return {

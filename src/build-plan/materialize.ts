@@ -3,6 +3,7 @@ import path from "node:path";
 import { capabilityBlock } from "./blocks.js";
 import type { BuildPlan, FileOwner, MaterializedFile } from "./types.js";
 import type { ProductSpec } from "../product-spec/types.js";
+import { BASE_UI_STYLES } from "./ui-styles.js";
 
 function resolveOwnedPath(outputDirectory: string, relativePath: string): string {
   const absolute = path.resolve(outputDirectory, relativePath);
@@ -145,27 +146,7 @@ createRoot(document.getElementById("root")!).render(
     },
     {
       path: "src/styles.css",
-      content: `:root {
-  color: #17221c;
-  background: #f3f2ec;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-}
-
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
-button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
-.app-shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 64px; }
-.app-header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 32px; }
-.eyebrow { margin: 0 0 8px; text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; font-weight: 700; }
-h1 { margin: 0; font-size: clamp(2rem, 6vw, 4.5rem); line-height: .95; letter-spacing: -.05em; }
-.subtitle { max-width: 60ch; color: #536159; }
-.field-error { color: #a52a2a; font-weight: 650; }
-.empty-state { border: 1px dashed #95a098; border-radius: 18px; padding: 32px; background: rgba(255,255,255,.55); }
-@media (max-width: 640px) { .app-shell { width: min(100% - 20px, 1120px); padding-top: 24px; } .app-header { align-items: start; flex-direction: column; } }
-`,
+      content: BASE_UI_STYLES,
     },
   ];
   for (const file of files) assertOwner(plan, file.path, "LINKER", "deterministic_linker");

@@ -1,6 +1,6 @@
 # Final-push setup — 4 September 2026
 
-Status: preparation authorized and performed; implementation plan and goal await Rafael's acceptance. This document describes the working setup, not an accepted architecture or promise of a top-three result.
+Status: preparation completed. Rafael subsequently accepted the [development goal](implementation.md), which now governs execution and supersedes proposed sequencing or approval boundaries below where they differ. This setup document preserves the preparation record.
 
 ## Starting point
 

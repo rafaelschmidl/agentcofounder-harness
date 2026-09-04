@@ -7,6 +7,7 @@ import {
   composeResult,
   missingRequiredResultPaths,
   normalizePartialResult,
+  productReport,
   readPartialResult,
   rootStartCommand,
   writeResult,
@@ -18,6 +19,7 @@ import type {
   UsageSummary,
 } from "../src/types.js";
 import { validateResultObject } from "../src/validate-result.js";
+import { validProductSpec } from "./fixtures/product-spec.js";
 
 const partial: PartialRunResult = {
   status: "success",
@@ -73,6 +75,30 @@ const portReclamation: PortReclamationAudit = {
 };
 
 describe("result contract", () => {
+  it("cannot claim every product journey passed from an aggregate app pass", () => {
+    const report = productReport(validProductSpec(), verification);
+    expect(report.status).toBe("partial");
+    expect(report.tests_run.every((journey) => journey.result === "failed")).toBe(true);
+    expect(report.tests_run[0]?.journey).toContain("No per-journey test evidence");
+    expect(report.implemented_features).toEqual([]);
+  });
+
+  it("preserves individually executed journey results when another journey is missing", () => {
+    const report = productReport(validProductSpec(), {
+      ...verification,
+      passed: false,
+      journeys: [
+        { id: "journey_add_note", result: "passed", testNames: ["[journey_add_note] saves a note"], diagnostic: "1 tagged test passed." },
+        { id: "journey_validate_note", result: "failed", testNames: [], diagnostic: "No tagged test executed." },
+      ],
+    });
+    expect(report.status).toBe("partial");
+    expect(report.tests_run.map((journey) => journey.result)).toEqual(["passed", "failed"]);
+    expect(report.tests_run[0]?.journey).toBe("Add a note");
+    expect(report.tests_run[1]?.journey).toContain("No tagged test executed");
+    expect(report.implemented_features).toEqual(["Capture notes"]);
+  });
+
   it("accepts a reconciled result", async () => {
     const result = composeResult(partial, usage, 0, verification, portReclamation, ROOT_START_COMMAND);
     expect(await validateResultObject(result)).toEqual([]);

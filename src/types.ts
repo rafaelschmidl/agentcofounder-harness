@@ -57,6 +57,15 @@ export interface PartialRunResult {
 export interface AppVerification {
   passed: boolean;
   checks: TestRun[];
+  journeys?: JourneyVerification[];
+  incompleteFiles?: string[];
+}
+
+export interface JourneyVerification {
+  id: string;
+  result: "passed" | "failed";
+  testNames: string[];
+  diagnostic: string;
 }
 
 export interface PortReclamationAudit {

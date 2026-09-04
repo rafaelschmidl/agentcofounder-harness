@@ -82,23 +82,31 @@ export async function readPartialResult(appDirectory: string): Promise<PartialRu
 }
 
 export function productReport(spec: ProductSpec, verification: AppVerification): PartialRunResult {
-  const journeyResult: TestRun["result"] = verification.passed ? "passed" : "failed";
+  const evidence = new Map((verification.journeys ?? []).map((journey) => [journey.id, journey]));
+  const testsRun: TestRun[] = spec.acceptance_journeys.map((journey) => {
+    const executed = evidence.get(journey.id);
+    const passed = executed?.result === "passed" && executed.testNames.length > 0;
+    return {
+      command: verification.checks.find((check) => /vitest|npm test/u.test(check.command))?.command ?? "vitest run",
+      journey: passed ? journey.title : `${journey.title} — ${executed?.diagnostic ?? "No per-journey test evidence was recorded."}`,
+      result: passed ? "passed" : "failed",
+    };
+  });
+  const passed = verification.passed && testsRun.length > 0 && testsRun.every((journey) => journey.result === "passed");
   return {
-    status: verification.passed ? "success" : "partial",
+    status: passed ? "success" : "partial",
     app_url: "http://localhost:3000",
     start_command: "npm run dev",
-    summary: verification.passed
-      ? `Generated and verified ${spec.product.summary}`
+    summary: passed
+      ? `Generated ${spec.product.summary} All declared journeys have passing generated tests; build and startup checks passed.`
       : `Generated ${spec.product.summary}, but one or more harness verification checks failed.`,
     implemented_features: spec.requirements
-      .filter((requirement) => requirement.disposition === "IMPLEMENT")
+      .filter((requirement) => requirement.disposition === "IMPLEMENT" && requirement.journey_ids.length > 0
+        && requirement.journey_ids.every((id) => evidence.get(id)?.result === "passed"
+          && (evidence.get(id)?.testNames.length ?? 0) > 0))
       .map((requirement) => requirement.title),
     assumptions: [...spec.assumptions],
-    tests_run: spec.acceptance_journeys.map((journey) => ({
-      command: "npm test",
-      journey: journey.title,
-      result: journeyResult,
-    })),
+    tests_run: testsRun,
   };
 }
 

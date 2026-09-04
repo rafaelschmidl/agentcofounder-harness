@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,7 +21,7 @@ import { createPiEnvironment } from "./pi-environment.js";
 import { runPi } from "./pi-runner.js";
 import { runProductSpecInterpretation } from "./product-spec/interpreter.js";
 import { auditAppPortAfterPi } from "./port-owner.js";
-import { collectRepairDiagnosis, MAX_REPAIR_CYCLES } from "./repair.js";
+import { collectRepairDiagnosis, MAX_REPAIR_CYCLES, type RepairDiagnosis } from "./repair.js";
 import {
   composeResult,
   missingRequiredResultPaths,
@@ -30,9 +31,9 @@ import {
 } from "./result.js";
 import { collectUsageFromJsonLines } from "./usage.js";
 import { RunTrace } from "./trace.js";
-import type { RunResult } from "./types.js";
+import type { AppVerification, RunResult } from "./types.js";
 import { validateResultObject } from "./validate-result.js";
-import { portHasListener, unavailableAppVerification, verifyGeneratedApp } from "./verify-app.js";
+import { captureRequiredArtifacts, portHasListener, unavailableAppVerification, verifyGeneratedApp } from "./verify-app.js";
 
 interface Arguments {
   ideaFile: string;
@@ -55,6 +56,32 @@ export function runRequiresFailureExit(
   missingResultPaths: string[],
 ): boolean {
   return missingResultPaths.length > 0 || piExitCode !== 0 || resultStatus !== "success";
+}
+
+export async function diagnoseVerification(
+  verificationDirectory: string,
+  outputDirectory: string,
+  verification: AppVerification,
+): Promise<RepairDiagnosis> {
+  const diagnosis = await collectRepairDiagnosis(verificationDirectory, outputDirectory);
+  const incompleteFiles = verification.incompleteFiles ?? [];
+  const uncovered = (verification.journeys ?? []).filter((journey) => journey.result !== "passed");
+  if (incompleteFiles.length === 0 && uncovered.length === 0) return diagnosis;
+  const missingEvidence = incompleteFiles.length > 0
+    ? `Required files are missing, empty, or still contain their seed: ${incompleteFiles.join(", ")}. Write their complete implementation.`
+    : uncovered.map((journey) => `${journey.id}: ${journey.diagnostic}`).join("\n");
+  const permittedPaths = incompleteFiles.length > 0 ? incompleteFiles
+    : diagnosis.stage === "unknown" ? ["src/product/product.test.tsx"] : diagnosis.permittedPaths;
+  const permittedEvidence = `## Permitted repair paths\n\n${permittedPaths.map((file) => `- ${file}`).join("\n")}`;
+  const existingEvidence = incompleteFiles.length > 0 ? permittedEvidence
+    : diagnosis.evidence.replace(/## Permitted repair paths\n\n[\s\S]*?(?=\n\n## |$)/u, permittedEvidence);
+  const evidence = `${existingEvidence}\n\n## Required completion evidence\n\n${missingEvidence}\n\nFor missing journey tests, add meaningful assertions under the exact [journey_id] tag; do not merely rename unrelated tests.`;
+  return {
+    ...diagnosis,
+    key: createHash("sha256").update(`${diagnosis.key}\n${missingEvidence}`).digest("hex"),
+    evidence,
+    permittedPaths,
+  };
 }
 
 async function readRetainedPiEvents(artifactDirectory: string): Promise<string> {
@@ -256,6 +283,8 @@ async function main(): Promise<void> {
   ]);
   await materializeBuildPlan(plan, spec, outputDirectory);
   await writeCompilerArtifacts(plan, spec, outputDirectory);
+  const requiredProductPaths = plan.file_ownership.filter((entry) => entry.owner === "AGENT").map((entry) => entry.path);
+  const requiredArtifacts = await captureRequiredArtifacts(outputDirectory, requiredProductPaths);
   await trace.record("compilation", "completed", "BuildPlan validated and deterministic blocks materialized.", {
     blocks: plan.blocks.map((block) => `${block.id}@${block.version}`),
     custom_slots: plan.custom_slots.map((slot) => slot.id),
@@ -276,18 +305,21 @@ async function main(): Promise<void> {
     remainingTime(),
     builderEnvironment,
     Math.max(1, MAX_PROVIDER_RESPONSES - interpretation.command.modelCalls),
-    4,
+    Number.POSITIVE_INFINITY,
+    requiredProductPaths,
   );
   if (builder.exitCode !== 0) {
     await trace.record("customization", "failed", "The constrained builder did not complete.", {
       exit_code: builder.exitCode,
       timed_out: builder.timedOut,
       successful_owned_writes: builder.successfulToolCalls,
+      completed_files: builder.completedFiles,
     });
   } else {
     await trace.record("customization", "completed", "The constrained builder completed within AGENT-owned files.", {
       successful_owned_writes: builder.successfulToolCalls,
-      stopped_after_owned_writes: builder.toolLimitReached,
+      stopped_after_required_files: builder.requiredFilesComplete,
+      completed_files: builder.completedFiles,
     });
   }
   const stageEventFiles = [interpretation.files.events, builderEvents];
@@ -303,7 +335,11 @@ async function main(): Promise<void> {
       const verificationDirectory = path.join(artifactDirectory, "verification", `attempt-${attempt}`);
       await mkdir(verificationDirectory, { recursive: true });
       await trace.record("verification", "started", `Started generated application verification attempt ${attempt}.`);
-      verification = await verifyGeneratedApp(outputDirectory, verificationDirectory, { displayRoot: REPOSITORY_ROOT });
+      verification = await verifyGeneratedApp(outputDirectory, verificationDirectory, {
+        displayRoot: REPOSITORY_ROOT,
+        requiredArtifacts,
+        journeys: spec.acceptance_journeys,
+      });
       await trace.record(
         "verification",
         verification.passed ? "completed" : "failed",
@@ -314,7 +350,7 @@ async function main(): Promise<void> {
       );
       if (verification.passed || attempt === MAX_REPAIR_CYCLES) break;
 
-      const diagnosis = await collectRepairDiagnosis(verificationDirectory, outputDirectory);
+      const diagnosis = await diagnoseVerification(verificationDirectory, outputDirectory, verification);
       if (diagnosisKeys.has(diagnosis.key)) {
         await trace.record("repair", "failed", "Refused a repair with an unchanged diagnosis.", {
           attempt: attempt + 1,
@@ -369,7 +405,6 @@ async function main(): Promise<void> {
         remainingTime(),
         repairEnvironment,
         remainingCalls,
-        Math.max(1, Math.min(2, diagnosis.permittedPaths.length)),
       );
       stageEventFiles.push(repairEvents);
       customizationExitCode = repair.exitCode;

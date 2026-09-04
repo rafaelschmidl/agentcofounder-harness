@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PiResponseBudget, PiToolBudget, summarizeEventLine } from "../src/pi-runner.js";
+import { PiFileCompletion, PiResponseBudget, PiToolBudget, summarizeEventLine } from "../src/pi-runner.js";
 
 function assistantEvent(stopReason: string, toolCalls: number): string {
   return JSON.stringify({
@@ -57,5 +57,43 @@ describe("Pi response budget", () => {
     expect(budget.observe(summarizeEventLine(toolEnd()))).toBe(true);
     expect(budget.successfulTools).toBe(2);
     expect(budget.limitReached).toBe(true);
+  });
+
+  it("allows a naturally terminating repair to edit the same file more than twice", () => {
+    const budget = new PiToolBudget();
+    for (let index = 0; index < 4; index += 1) {
+      expect(budget.observe(summarizeEventLine(JSON.stringify({
+        type: "tool_execution_end", toolName: "edit", toolCallId: `edit-${index}`, isError: false,
+      })))).toBe(false);
+    }
+    expect(budget.successfulTools).toBe(4);
+    expect(budget.limitReached).toBe(false);
+  });
+});
+
+describe("required product file completion", () => {
+  it("does not substitute a repeated App write for the stylesheet", () => {
+    const files = ["src/product/domain.ts", "src/product/App.tsx", "src/product/product.test.tsx", "src/product/styles.css"];
+    const completion = new PiFileCompletion("/app", files);
+    const write = (id: string, file: string, isError = false): boolean => {
+      completion.observe(summarizeEventLine(JSON.stringify({ type: "tool_execution_start", toolName: "write", toolCallId: id, args: { path: file } })));
+      return completion.observe(summarizeEventLine(JSON.stringify({ type: "tool_execution_end", toolName: "write", toolCallId: id, isError })));
+    };
+    expect(write("one", files[0]!)).toBe(false);
+    expect(write("two", files[1]!)).toBe(false);
+    expect(write("three", files[1]!)).toBe(false);
+    expect(write("four", files[2]!)).toBe(false);
+    expect(completion.completedFiles).toHaveLength(3);
+    expect(write("failed-style", files[3]!, true)).toBe(false);
+    expect(write("style", "/app/src/product/styles.css")).toBe(true);
+    expect(completion.completedFiles).toEqual([...files].sort());
+  });
+
+  it("requires correlated successful execution and ignores unrelated paths", () => {
+    const completion = new PiFileCompletion("/app", ["src/product/App.tsx"]);
+    expect(completion.observe(summarizeEventLine(JSON.stringify({ type: "tool_execution_end", toolName: "write", toolCallId: "missing-start", isError: false })))).toBe(false);
+    completion.observe(summarizeEventLine(JSON.stringify({ type: "tool_execution_start", toolName: "write", toolCallId: "other", args: { path: "/other/src/product/App.tsx" } })));
+    expect(completion.observe(summarizeEventLine(JSON.stringify({ type: "tool_execution_end", toolName: "write", toolCallId: "other", isError: false })))).toBe(false);
+    expect(new PiFileCompletion("/app").complete).toBe(false);
   });
 });

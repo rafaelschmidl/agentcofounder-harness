@@ -72,7 +72,7 @@ async function createTestApp(testSource?: string): Promise<{ appDirectory: strin
       "}",
       "",
       'describe("generated journey", () => {',
-      '  it("uses the configured DOM and matcher setup", async () => {',
+      '  it("[journey_increment] uses the configured DOM and matcher setup", async () => {',
       "    const user = userEvent.setup();",
       "    render(<Smoke />);",
       '    await user.click(screen.getByRole("button", { name: "Count 0" }));',
@@ -215,14 +215,30 @@ describe("app verification", () => {
       displayRoot: path.dirname(appDirectory),
       serverTimeoutMs: 10_000,
       port,
+      journeys: [{ id: "journey_increment" }],
     });
 
     expect(result.passed).toBe(true);
-    expect(result.checks.map((entry) => entry.result)).toEqual(["passed", "passed", "passed"]);
+    expect(result.checks.map((entry) => entry.result)).toEqual(["passed", "passed", "passed", "passed"]);
+    expect(result.journeys?.[0]).toMatchObject({ id: "journey_increment", result: "passed" });
+    expect(result.journeys?.[0]?.testNames).toHaveLength(1);
     expect(result.checks[0]?.command).toContain("--outputFile=");
     expect(result.checks[0]?.command).toContain(path.join("app", "node_modules", ".bin", "vitest"));
     const displayedReportPath = result.checks[0]?.command.split("--outputFile=")[1]?.split(" ")[0];
     expect(displayedReportPath).toBe(path.join("artifacts", "app-test-results.json"));
+  }, 45_000);
+
+  it("rejects a declared journey missing from otherwise passing executed tests", async () => {
+    const { appDirectory, artifactDirectory } = await createTestApp();
+    const result = await verifyGeneratedApp(appDirectory, artifactDirectory, {
+      commandTimeoutMs: 30_000,
+      serverTimeoutMs: 10_000,
+      port: await getFreePort(),
+      journeys: [{ id: "journey_increment" }, { id: "journey_refresh" }],
+    });
+    expect(result.passed).toBe(false);
+    expect(result.checks.slice(0, 3).every((check) => check.result === "passed")).toBe(true);
+    expect(result.journeys?.map((journey) => journey.result)).toEqual(["passed", "failed"]);
   }, 45_000);
 
   it("rejects a Vitest report containing only todo tests", async () => {

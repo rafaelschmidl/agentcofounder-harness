@@ -8,11 +8,19 @@ const objectSchema = (properties: Record<string, unknown>, required: string[] = 
 });
 
 function foundationFiles(config: Record<string, unknown>): MaterializedFile[] {
-  const productName = typeof config.product_name === "string" ? config.product_name : "Generated product";
+  const productSummary = typeof config.product_name === "string" ? config.product_name.trim() : "Your collection";
+  // The interpreted summary may contain the entire brief. Keep it available as
+  // context while preventing it from becoming a paragraph-sized product title.
+  const normalized = productSummary.replace(/\s+/gu, " ") || "Your collection";
+  const productName = normalized.length <= 56
+    ? normalized
+    : `${normalized.slice(0, 53).replace(/\s+\S*$/u, "").trimEnd()}…`;
   return [
     {
       path: "src/system/product.ts",
-      content: `export const PRODUCT_NAME = ${JSON.stringify(productName)};\n`,
+      content: `export const PRODUCT_NAME = ${JSON.stringify(productName)};
+export const PRODUCT_SUMMARY = ${JSON.stringify(productSummary)};
+`,
     },
     {
       path: "src/test/setup.ts",
@@ -224,26 +232,43 @@ function accessibleShellFiles(): MaterializedFile[] {
   return [
     {
       path: "src/system/ui.tsx",
-      content: `import type { PropsWithChildren, ReactNode } from "react";
+      content: `import { useEffect, useId, type PropsWithChildren, type ReactNode } from "react";
 
-export function AppShell({ title, subtitle, actions, children }: PropsWithChildren<{
+export function AppShell({ title, subtitle, eyebrow, actions, navigation, children }: PropsWithChildren<{
   title: string;
   subtitle?: string;
+  eyebrow?: string;
   actions?: ReactNode;
+  navigation?: ReactNode;
 }>) {
+  const mainId = useId();
+  useEffect(() => { document.title = title; }, [title]);
   return (
     <div className="app-shell">
+      <a className="skip-link" href={"#" + mainId}>Skip to content</a>
       <header className="app-header">
-        <div>
-          <p className="eyebrow">Local workspace</p>
-          <h1>{title}</h1>
-          {subtitle ? <p className="subtitle">{subtitle}</p> : null}
+        <div className="app-identity">
+          <span className="product-mark" aria-hidden="true">{title.trim().slice(0, 1).toUpperCase()}</span>
+          <div className="app-heading">
+            {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+            <h1>{title}</h1>
+            {subtitle ? <p className="subtitle">{subtitle}</p> : null}
+          </div>
         </div>
         {actions ? <div className="header-actions">{actions}</div> : null}
       </header>
-      <main>{children}</main>
+      {navigation ? <nav className="app-navigation" aria-label="Main navigation">{navigation}</nav> : null}
+      <main id={mainId} tabIndex={-1}>{children}</main>
     </div>
   );
+}
+
+export function SectionHeader({ title, description, actions }: {
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+}) {
+  return <div className="section-header"><div><h2>{title}</h2>{description ? <p className="section-description">{description}</p> : null}</div>{actions ? <div className="actions">{actions}</div> : null}</div>;
 }
 
 export function FieldError({ id, children }: PropsWithChildren<{ id: string }>) {
@@ -251,8 +276,13 @@ export function FieldError({ id, children }: PropsWithChildren<{ id: string }>) 
   return <p id={id} role="alert" className="field-error">{children}</p>;
 }
 
-export function EmptyState({ title, children }: PropsWithChildren<{ title: string }>) {
-  return <section className="empty-state" aria-live="polite"><h2>{title}</h2><p>{children}</p></section>;
+export function EmptyState({ title, action, children }: PropsWithChildren<{ title: string; action?: ReactNode }>) {
+  return <section className="empty-state" aria-live="polite"><h2>{title}</h2>{children ? <div className="empty-state-copy">{children}</div> : null}{action ? <div className="empty-state-action">{action}</div> : null}</section>;
+}
+
+export function StatusMessage({ tone = "info", children }: PropsWithChildren<{ tone?: "info" | "success" | "error" }>) {
+  if (!children) return null;
+  return <p className="status-message" data-tone={tone} role={tone === "error" ? "alert" : "status"}>{children}</p>;
 }
 `,
     },
@@ -298,7 +328,7 @@ describe("compiled application smoke contract", () => {
 export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
   {
     id: "app.foundation",
-    version: "1.0.0",
+    version: "1.1.0",
     config_schema: objectSchema({ product_name: { type: "string", minLength: 1 } }, ["product_name"]),
     capabilities: ["react-vite-app", "typed-extension-boundary"],
     dependencies: [],
@@ -316,7 +346,7 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
       "src/system/product.ts",
       "src/test/setup.ts"
     ],
-    exported_interfaces: ["PRODUCT_NAME"],
+    exported_interfaces: ["PRODUCT_NAME", "PRODUCT_SUMMARY"],
     materialize: foundationFiles,
     checks: ["npm run build"],
   },
@@ -391,13 +421,13 @@ export const CAPABILITY_BLOCKS: CapabilityBlock[] = [
   },
   {
     id: "ui.accessible-shell",
-    version: "1.0.0",
+    version: "1.1.0",
     config_schema: objectSchema({}, []),
-    capabilities: ["responsive-shell", "accessible-forms", "empty-states", "visible-errors"],
+    capabilities: ["responsive-shell", "accessible-forms", "empty-states", "visible-errors", "status-feedback"],
     dependencies: ["app.foundation"],
     conflicts: [],
     owned_files: ["src/system/ui.tsx"],
-    exported_interfaces: ["AppShell", "FieldError", "EmptyState"],
+    exported_interfaces: ["AppShell", "SectionHeader", "FieldError", "EmptyState", "StatusMessage"],
     materialize: accessibleShellFiles,
     checks: ["accessible names", "keyboard operation", "responsive layout"],
   },

@@ -130,17 +130,33 @@ describe("deterministic BuildPlan compiler", () => {
     await linkBuildPlan(plan, spec, directory);
     const agentFile = path.join(directory, "src/product/domain.ts");
     await writeFile(agentFile, "export const preserved = true;\n", "utf8");
+    await writeFile(path.join(directory, "src/product/styles.css"), ":root { --accent: #263f64; }\n", "utf8");
     await writeFile(path.join(directory, "src/system/collection.ts"), "tampered\n", "utf8");
     await materializeBuildPlan(plan, spec, directory);
     await linkBuildPlan(plan, spec, directory);
 
     expect(await readFile(agentFile, "utf8")).toBe("export const preserved = true;\n");
+    expect(await readFile(path.join(directory, "src/product/styles.css"), "utf8"))
+      .toBe(":root { --accent: #263f64; }\n");
     expect(await readFile(path.join(directory, "src/system/collection.ts"), "utf8")).toContain("upsertRecord");
     expect(await readFile(path.join(directory, "src/test/setup.ts"), "utf8")).toContain("afterEach(cleanup)");
     expect(await readFile(path.join(directory, "src/system/app-smoke.test.tsx"), "utf8"))
       .toContain("renders the default App without React runtime errors");
     expect(JSON.parse(await readFile(path.join(directory, "build_plan.json"), "utf8"))).toEqual(plan);
     expect(await readFile(path.join(directory, "src/App.tsx"), "utf8")).toContain("./product/App");
+  });
+
+  it("keeps a long interpreted brief out of the fallback product title without discarding it", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "product-identity-"));
+    temporaryDirectories.push(directory);
+    const spec = validProductSpec();
+    spec.product.summary = "A personal collection for keeping research notes, managing their status and preserving the complete working history across visits.";
+    await materializeBuildPlan(compileProductSpec(spec), spec, directory);
+    const product = await import(pathToFileURL(path.join(directory, "src/system/product.ts")).href);
+
+    expect(product.PRODUCT_NAME.length).toBeLessThanOrEqual(56);
+    expect(product.PRODUCT_NAME).toMatch(/^A personal collection/);
+    expect(product.PRODUCT_SUMMARY).toBe(spec.product.summary);
   });
 
   it("allows the builder to edit only exact AGENT-owned files", () => {
