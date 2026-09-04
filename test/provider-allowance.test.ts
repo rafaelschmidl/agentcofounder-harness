@@ -86,6 +86,31 @@ it("retains whole reservations for missing usage, failed streams, and timeouts w
   });
 });
 
+it("cancels an in-flight read once without inventing provider EOF or losing its unknown allowance", async () => {
+  await fixture(async (ledgerPath, directory) => {
+    let signalRead!: () => void;
+    const reading = new Promise<void>((resolve) => { signalRead = resolve; });
+    const cancelled = vi.fn();
+    const source = new ReadableStream<Uint8Array>({
+      pull() { signalRead(); return new Promise<void>(() => {}); },
+      cancel: cancelled,
+    });
+    const logPath = path.join(directory, "requests.jsonl");
+    const fetch = instrumentProviderFetch(async () => new Response(source), logPath, { path: ledgerPath, modelId: baseline.model_id, contextWindow: baseline.context_window });
+    const response = await fetch("http://fixture.invalid", wire());
+    const reader = response.body!.getReader();
+    const pendingRead = reader.read();
+    await reading;
+    await reader.cancel("fixture consumer cancellation");
+    expect(await pendingRead).toEqual({ done: true, value: undefined });
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    const events = (await readFile(logPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+    expect(events.filter((event) => /^response_body_(completed|failed|cancelled)$/u.test(event.event)).map((event) => event.event)).toEqual(["response_body_cancelled"]);
+    expect(events.some((event) => event.event === "allowance_usage_confirmed")).toBe(false);
+    expect((await read(ledgerPath)).requests[0]).toMatchObject({ status: "unknown", cost_total: 0.393216 });
+  });
+});
+
 it("refuses missing caps, modified wire models, corrupted ledgers and exhausted allowance before HTTP", async () => {
   await fixture(async (ledgerPath, directory) => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);

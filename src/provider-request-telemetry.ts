@@ -88,10 +88,10 @@ export function instrumentProviderFetch(fetch: typeof globalThis.fetch, logPath:
       try { await markProviderRequestUnknown(allowance.path, localRequestId); }
       catch { record("allowance_update_failed"); }
     };
-    const usage = allowance ? createProviderUsageObserver(async (confirmed) => {
+    const usage = createProviderUsageObserver(allowance ? async (confirmed) => {
       await settleProviderRequest(allowance.path, localRequestId, confirmed);
       record("allowance_usage_confirmed", { input_tokens_including_cache: confirmed.inputTokens, output_tokens: confirmed.outputTokens });
-    }) : undefined;
+    } : undefined, (error) => record("provider_sse_error", error));
     let response: Response;
     try { response = await fetch(input, init); }
     catch (error) {
@@ -111,31 +111,42 @@ export function instrumentProviderFetch(fetch: typeof globalThis.fetch, logPath:
     }
     const reader = response.body.getReader();
     let bytes = 0;
+    let terminal: "completed" | "failed" | "cancelled" | undefined;
+    let consumerCancelled = false;
     const body = new ReadableStream<Uint8Array>({
       async pull(controller) {
         try {
           const chunk = await reader.read();
+          // reader.cancel() resolves an outstanding read as done=true. That is
+          // not provider EOF and must never finalize usage or close a cancelled controller.
+          if (terminal !== undefined) return;
           if (chunk.done) {
+            terminal = "completed";
             try { if (usage && !await usage.complete()) await unknown(); }
             catch { record("allowance_update_failed"); }
             record("response_body_completed", { response_bytes: bytes });
-            controller.close();
+            if (!consumerCancelled) controller.close();
           } else {
             bytes += chunk.value.byteLength;
             try { await usage?.feed(chunk.value); }
             catch { record("allowance_update_failed"); }
-            controller.enqueue(chunk.value);
+            if (terminal === undefined && !consumerCancelled) controller.enqueue(chunk.value);
           }
         } catch (error) {
+          if (terminal !== undefined) return;
+          terminal = "failed";
           record("response_body_failed", { phase: "after_response_headers", response_bytes: bytes, errors: errorKinds(error) });
           await unknown();
-          controller.error(error);
+          if (!consumerCancelled) controller.error(error);
         }
       },
       async cancel(reason) {
+        consumerCancelled = true;
+        if (terminal !== undefined) { await reader.cancel(reason); return; }
+        // Claim cancellation synchronously before the pending read can resume.
+        terminal = "cancelled";
         record("response_body_cancelled", { phase: "after_response_headers", response_bytes: bytes });
-        await unknown();
-        await reader.cancel(reason);
+        await Promise.all([reader.cancel(reason), unknown()]);
       },
     });
     const observed = new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });

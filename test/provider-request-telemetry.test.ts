@@ -140,6 +140,41 @@ it("records the original connection cause before the installed SDK normalizes it
   });
 }, 20_000);
 
+it("captures safe SSE error labels across split UTF8 chunks before the installed SDK cancels an in-flight stream", async () => {
+  await fixture(async (provider, logPath) => {
+    const raw = new TextEncoder().encode(
+      `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta: { role: "assistant", content: "fixture-private-café 🔒" }, finish_reason: null }] })}\r\n\r\n`
+      + `event: error\r\ndata: ${JSON.stringify({ error: { code: "server_error", type: "fixture-private-type", message: "fixture-private-message 🔒" } })}\r\n\r\n`,
+    );
+    let offset = 0;
+    const cancelled = vi.fn();
+    const transport: typeof globalThis.fetch = async () => new Response(new ReadableStream<Uint8Array>({
+      pull(controller) {
+        // Split every multibyte character and SSE boundary; keep a pending read after the error.
+        if (offset < raw.length) controller.enqueue(raw.slice(offset, ++offset));
+        else return new Promise<void>(() => {});
+      },
+      cancel: cancelled,
+    }), { headers: { "content-type": "text/event-stream" } });
+    const result = await provider.streamSimple(provider.getModels()[0]!, {
+      messages: [{ role: "user", content: "fixture-private-prompt", timestamp: 1 }],
+    }, { apiKey: "fixture-private-key", maxTokens: 64, fetch: transport, maxRetries: 0 }).result();
+    expect(result.stopReason).toBe("error");
+    expect(result.usage.totalTokens).toBe(0);
+    await vi.waitFor(async () => {
+      const ledger = JSON.parse(await readFile(path.join(path.dirname(logPath), "allowance.json"), "utf8"));
+      expect(ledger.requests[0]).toMatchObject({ status: "unknown", cost_total: 0.327808 });
+    });
+    const text = await readFile(logPath, "utf8");
+    const events = text.trim().split("\n").map((line) => JSON.parse(line));
+    expect(events.filter((event) => event.event === "provider_sse_error")).toHaveLength(1);
+    expect(events.find((event) => event.event === "provider_sse_error")).toMatchObject({ error_envelope_present: true, named_error_event: true, code: "server_error", type: "unrecognized" });
+    expect(events.filter((event) => /^response_body_(completed|failed|cancelled)$/u.test(event.event)).map((event) => event.event)).toEqual(["response_body_cancelled"]);
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    expect(text).not.toContain("fixture-private");
+  }, true);
+}, 20_000);
+
 it("does not turn a response-body failure into completion or hide the original error", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "provider-body-telemetry-"));
   try {
