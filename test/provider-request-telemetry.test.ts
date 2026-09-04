@@ -11,7 +11,7 @@ import { initializeProviderAllowance } from "../src/provider-allowance.js";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-async function fixture(run: (provider: Provider, logPath: string, requests: { headers: http.IncomingHttpHeaders; body: string }[]) => Promise<void>, guarded = false) {
+async function fixture(run: (provider: Provider, logPath: string, requests: { headers: http.IncomingHttpHeaders; body: string }[]) => Promise<void>, guarded = false, options: { maxRequests?: number; failRequests?: number } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "provider-telemetry-"));
   const logPath = path.join(directory, "provider-requests.jsonl");
   const requests: { headers: http.IncomingHttpHeaders; body: string }[] = [];
@@ -24,6 +24,11 @@ async function fixture(run: (provider: Provider, logPath: string, requests: { he
     let body = "";
     for await (const chunk of request) body += String(chunk);
     requests.push({ headers: request.headers, body });
+    if (requests.length <= (options.failRequests ?? 0)) {
+      response.writeHead(503, { "content-type": "application/json", "retry-after": "0" });
+      response.end(JSON.stringify({ error: { message: "local retryable fixture failure" } }));
+      return;
+    }
     response.writeHead(200, { "content-type": "text/event-stream", "x-request-id": "local-provider-request-17", "x-sensitive-header": "fixture-sensitive-header" });
     response.write(`data: ${JSON.stringify({ id: "completion-17", object: "chat.completion.chunk", created: 1, model: "zai-org/GLM-5.2", choices: [{ index: 0, delta: { role: "assistant", content: "ok" }, finish_reason: null }] })}\n\n`);
     response.write(`data: ${JSON.stringify({ id: "completion-17", object: "chat.completion.chunk", created: 1, model: "zai-org/GLM-5.2", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 1, total_tokens: 11 } })}\n\n`);
@@ -36,6 +41,7 @@ async function fixture(run: (provider: Provider, logPath: string, requests: { he
     vi.stubEnv("BERGET_API_URL", `http://127.0.0.1:${address.port}`);
     vi.stubEnv("BERGET_INFERENCE_URL", `http://127.0.0.1:${address.port}/v1`);
     vi.stubEnv("SYSTEM_V0_PROVIDER_REQUEST_LOG", logPath);
+    vi.stubEnv("SYSTEM_V0_MAX_PROVIDER_REQUESTS", options.maxRequests === undefined ? undefined : String(options.maxRequests));
     if (guarded) {
       const ledgerPath = path.join(directory, "allowance.json");
       await initializeProviderAllowance(ledgerPath, { version: 1, currency: "EUR", limit: 1, baseline_cost: 0, baseline_evidence: "local-fixture", model_id: "zai-org/GLM-5.2", context_window: 327680, input_price_per_token: 0.000001, output_price_per_token: 0.000002, requests: [] });
@@ -74,6 +80,51 @@ it("retains safe wire and HTTP evidence through the installed official provider 
     expect(events[1]).toMatchObject({ status: 200, provider_request_id: "local-provider-request-17" });
     for (const secret of ["fixture-private-system", "fixture-private-prompt", "fixture-private-key", "fixture-sensitive-header", "127.0.0.1"]) expect(text).not.toContain(secret);
   });
+}, 20_000);
+
+it("shares the inference cap between official stream methods and refuses before another allowance reservation", async () => {
+  await fixture(async (provider, logPath, requests) => {
+    const model = provider.getModels()[0]!;
+    const context = { messages: [{ role: "user" as const, content: "local fixture", timestamp: 1 }] };
+    const first = await provider.streamSimple(model, context, { apiKey: "local-fixture-key", maxTokens: 64, maxRetries: 0 }).result();
+    const second = await provider.stream(model, context, { apiKey: "local-fixture-key", maxTokens: 64, maxRetries: 0 }).result();
+    expect([first.stopReason, second.stopReason]).toEqual(["stop", "error"]);
+    expect(requests).toHaveLength(1);
+    const ledger = JSON.parse(await readFile(path.join(path.dirname(logPath), "allowance.json"), "utf8"));
+    expect(ledger.requests).toHaveLength(1);
+    expect(ledger.requests[0].status).toBe("measured");
+    const events = (await readFile(logPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+    expect(events.filter((event) => event.event === "request_started")).toHaveLength(1);
+    expect(events.filter((event) => event.event === "request_cap_refused")).toEqual([expect.objectContaining({ phase: "before_allowance_and_http_dispatch", max_requests: 1, admitted_requests: 1 })]);
+  }, true, { maxRequests: 1 });
+}, 20_000);
+
+it.each([1, 2])("counts failed official-provider transport retries toward a %i-request invocation cap", async (maxRequests) => {
+  await fixture(async (provider, logPath, requests) => {
+    const model = provider.getModels()[0]!;
+    const context = { messages: [{ role: "user" as const, content: "local fixture", timestamp: 1 }] };
+    const result = await provider.streamSimple(model, context, { apiKey: "local-fixture-key", maxTokens: 64, maxRetries: 2 }).result();
+    expect(result.stopReason).toBe(maxRequests === 1 ? "error" : "stop");
+    expect(requests).toHaveLength(maxRequests);
+    // A new stream shares the exhausted counter with retries from the first.
+    const next = await provider.stream(model, context, { apiKey: "local-fixture-key", maxTokens: 64, maxRetries: 0 }).result();
+    expect(next.stopReason).toBe("error");
+    expect(requests).toHaveLength(maxRequests);
+    const events = (await readFile(logPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+    expect(events.filter((event) => event.event === "request_started")).toHaveLength(maxRequests);
+    expect(events.filter((event) => event.event === "request_cap_refused").length).toBeGreaterThanOrEqual(1);
+  }, false, { maxRequests, failRequests: 1 });
+}, 20_000);
+
+it("claims invocation slots synchronously across concurrent official-provider streams", async () => {
+  await fixture(async (provider, _logPath, requests) => {
+    const model = provider.getModels()[0]!;
+    const context = { messages: [{ role: "user" as const, content: "local fixture", timestamp: 1 }] };
+    const options = { apiKey: "local-fixture-key", maxTokens: 64, maxRetries: 0 };
+    const results = await Promise.all([provider.streamSimple(model, context, options).result(), provider.stream(model, context, options).result()]);
+    expect(results.map((result) => result.stopReason).sort()).toEqual(["error", "stop"]);
+    expect(requests).toHaveLength(1);
+  }, true, { maxRequests: 1 });
 }, 20_000);
 
 it("uses and durably settles the shared guard through the installed official provider", async () => {

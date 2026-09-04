@@ -41,5 +41,6 @@ export async function initializeBergetWithRetry(
 
 export default async function bergetProvider(pi: ExtensionAPI): Promise<void> {
   const installed = await import(pathToFileURL(resolveOfficialBergetExtension()).href) as { default: Initializer };
-  await initializeBergetWithRetry(withProviderRequestTelemetry(pi, process.env.SYSTEM_V0_PROVIDER_REQUEST_LOG, process.env.SYSTEM_V0_ALLOWANCE_LEDGER), installed.default);
+  const cap = process.env.SYSTEM_V0_MAX_PROVIDER_REQUESTS;
+  await initializeBergetWithRetry(withProviderRequestTelemetry(pi, process.env.SYSTEM_V0_PROVIDER_REQUEST_LOG, process.env.SYSTEM_V0_ALLOWANCE_LEDGER, cap === undefined ? undefined : Number(cap)), installed.default);
 }

@@ -219,7 +219,12 @@ export async function runPi(
       const child = spawn(piBinary, args, {
         cwd,
         detached: usesDetachedProcessGroup(),
-        env: { ...environment, PI_OFFLINE: "1" },
+        env: {
+          ...environment, PI_OFFLINE: "1",
+          // Per invocation, including retries. The global response budget is
+          // still response-based; this prevents extra dispatch during shutdown.
+          SYSTEM_V0_MAX_PROVIDER_REQUESTS: Number.isFinite(maxModelCalls) ? String(Math.ceil(maxModelCalls)) : undefined,
+        },
         shell: false,
         stdio: ["ignore", "pipe", "pipe"],
       });

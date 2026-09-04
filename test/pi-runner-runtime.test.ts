@@ -5,7 +5,12 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { runPi } from "../src/pi-runner.js";
 
-it.each([false, true])("signals once at the response cap, retains the drained batch and completes native shutdown (failed tool: %s)", async (failedTool) => {
+it.each([
+  { failedTool: false, officialProvider: false },
+  { failedTool: true, officialProvider: false },
+  { failedTool: false, officialProvider: true },
+  { failedTool: true, officialProvider: true },
+])("signals once, retains the final batch and completes shutdown ($officialProvider official provider, $failedTool failed tool)", async ({ failedTool, officialProvider }) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "pi-cap-shutdown-"));
   const app = path.join(directory, "app");
   const state = path.join(directory, "state");
@@ -28,6 +33,11 @@ export default function observe(pi) {
 }`);
   let requests = 0;
   const server = http.createServer(async (request, response) => {
+    if (request.url === "/v1/models/chat") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ models: [{ id: "zai-org/GLM-5.2", contextWindow: 32768, inputPricePerToken: 0.000001, outputPricePerToken: 0.000002 }] }));
+      return;
+    }
     for await (const _ of request) { /* Drain the local fixture body. */ }
     requests += 1;
     const calls = ["app.ts", "domain.ts", "styles.css"].map((file, index) => ({
@@ -52,20 +62,39 @@ export default function observe(pi) {
     } } }));
     const eventsFile = path.join(directory, "events.jsonl");
     const stderrFile = path.join(directory, "stderr.log");
+    const requestLog = path.join(directory, "provider-requests.jsonl");
     const result = await runPi([
       "--mode", "json", "--print", "--offline", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files",
-      "--tools", "write,edit", "--provider", "fixture", "--model", "fixture", "--thinking", "off", "--extension", extension,
+      "--tools", "write,edit", "--provider", officialProvider ? "berget" : "fixture", "--model", officialProvider ? "zai-org/GLM-5.2" : "fixture", "--thinking", "off",
+      ...(officialProvider ? ["--extension", path.resolve("solution/extensions/berget-provider.ts")] : []),
+      "--extension", extension,
       "--system-prompt", "Write local fixture files.", "Write the fixture.",
     ], app, eventsFile, stderrFile, 15_000, {
       PATH: process.env.PATH, HOME: directory, PI_CODING_AGENT_DIR: state, PI_OFFLINE: "1", FIXTURE_SHUTDOWN_LOG: shutdownLog,
+      BERGET_API_KEY: "local-fixture-key", BERGET_API_URL: `http://127.0.0.1:${address.port}`, BERGET_INFERENCE_URL: `http://127.0.0.1:${address.port}/v1`,
+      SYSTEM_V0_PROVIDER_REQUEST_LOG: requestLog,
     }, 1);
     const events = (await readFile(eventsFile, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
     const shutdown = (await readFile(shutdownLog, "utf8")).trim().split("\n").map((line) => JSON.parse(line).event);
-    expect(result).toMatchObject({ exitCode: 0, timedOut: false, modelCalls: 1, callLimitReached: true, successfulToolCalls: 4 });
+    expect(result).toMatchObject({ timedOut: false, callLimitReached: true, successfulToolCalls: 4 });
+    // A local cap refusal can produce a zero-usage Pi error before shutdown,
+    // changing native exit to 143. Retain it; this fixture claims no verification pass.
+    expect(officialProvider ? [0, 143] : [0]).toContain(result.exitCode);
     // A stdout stop is not an HTTP admission guard: the next dispatch may race
     // the signal. Preserve that limitation instead of claiming a strict cap.
-    console.info("[pi-cap-fixture]", JSON.stringify({ failedTool, httpDispatches: requests, completedResponses: result.modelCalls, shutdown }));
+    console.info("[pi-cap-fixture]", JSON.stringify({ failedTool, officialProvider, httpDispatches: requests, observedAssistantResponses: result.modelCalls, shutdown }));
     expect(requests).toBeGreaterThanOrEqual(1);
+    if (officialProvider) {
+      expect(requests).toBe(1);
+      const transport = (await readFile(requestLog, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+      const dispatched = transport.filter((event) => event.event === "request_started");
+      expect(dispatched).toHaveLength(1);
+      for (const refused of transport.filter((event) => event.event === "request_cap_refused")) {
+        expect(refused).toMatchObject({ phase: "before_allowance_and_http_dispatch", max_requests: 1, admitted_requests: 1 });
+        expect(refused.local_request_id).not.toBe(dispatched[0].local_request_id);
+      }
+    }
+    expect(events.filter((event) => event.type === "message_end" && event.message?.role === "assistant" && event.message?.stopReason === "toolUse")).toHaveLength(1);
     expect(events.filter((event) => event.type === "tool_execution_end")).toHaveLength(failedTool ? 5 : 4);
     expect(events.filter((event) => event.type === "tool_execution_end" && event.isError)).toHaveLength(failedTool ? 1 : 0);
     expect(await readFile(path.join(app, "app.ts"), "utf8")).toBe("final batch correction");

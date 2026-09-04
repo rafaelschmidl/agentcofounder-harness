@@ -57,8 +57,25 @@ function requestShape(body: BodyInit | null | undefined): Record<string, unknown
   } catch { return { ...common, input_payload_bytes: null, output_token_cap: null }; }
 }
 
+/** Shared by every inference stream and transport retry in one Pi invocation. */
+export class ProviderRequestCap {
+  admittedRequests = 0;
+
+  constructor(readonly maxRequests: number) {
+    if (!Number.isSafeInteger(maxRequests) || maxRequests < 1) throw new Error("Provider HTTP request cap must be a positive safe integer");
+  }
+
+  admit(): boolean {
+    if (this.admittedRequests >= this.maxRequests) return false;
+    // Claim synchronously, before any reservation awaits, so concurrent streams
+    // cannot reuse a slot. Failed attempts conservatively consume their slot.
+    this.admittedRequests += 1;
+    return true;
+  }
+}
+
 /** The supported per-request fetch option keeps instrumentation local to provider inference. */
-export function instrumentProviderFetch(fetch: typeof globalThis.fetch, logPath: string, allowance?: { path: string; modelId: string; contextWindow: number }): typeof globalThis.fetch {
+export function instrumentProviderFetch(fetch: typeof globalThis.fetch, logPath: string, allowance?: { path: string; modelId: string; contextWindow: number }, cap?: ProviderRequestCap): typeof globalThis.fetch {
   let warned = false;
   return async (input, init) => {
     const localRequestId = randomUUID();
@@ -71,6 +88,10 @@ export function instrumentProviderFetch(fetch: typeof globalThis.fetch, logPath:
         warned = true;
       }
     };
+    if (cap && !cap.admit()) {
+      record("request_cap_refused", { phase: "before_allowance_and_http_dispatch", max_requests: cap.maxRequests, admitted_requests: cap.admittedRequests });
+      throw new Error("Pi invocation inference HTTP request cap reached; provider HTTP refused");
+    }
     const shape = requestShape(init?.body);
     if (allowance) {
       try {
@@ -156,14 +177,14 @@ export function instrumentProviderFetch(fetch: typeof globalThis.fetch, logPath:
   };
 }
 
-function instrumentProvider(provider: Provider, logPath: string, allowancePath: string | undefined): Provider {
+function instrumentProvider(provider: Provider, logPath: string, allowancePath: string | undefined, cap: ProviderRequestCap | undefined): Provider {
   return new Proxy(provider, {
     get(target, property) {
       const value = Reflect.get(target, property, target) as unknown;
       if (property === "stream" || property === "streamSimple") {
         return (model: { id: string; contextWindow: number }, context: unknown, options: { fetch?: typeof globalThis.fetch } = {}) =>
           Reflect.apply(value as (...args: unknown[]) => unknown, target, [model, context, {
-            ...options, fetch: instrumentProviderFetch(options.fetch ?? globalThis.fetch, logPath, allowancePath ? { path: allowancePath, modelId: model.id, contextWindow: model.contextWindow } : undefined),
+            ...options, fetch: instrumentProviderFetch(options.fetch ?? globalThis.fetch, logPath, allowancePath ? { path: allowancePath, modelId: model.id, contextWindow: model.contextWindow } : undefined, cap),
           }]);
       }
       return typeof value === "function" ? value.bind(target) : value;
@@ -172,9 +193,10 @@ function instrumentProvider(provider: Provider, logPath: string, allowancePath: 
 }
 
 /** Preserve the official provider catalog/auth/stream implementation and wrap only its supported transport seam. */
-export function withProviderRequestTelemetry(pi: ExtensionAPI, logPath: string | undefined, allowancePath?: string): ExtensionAPI {
+export function withProviderRequestTelemetry(pi: ExtensionAPI, logPath: string | undefined, allowancePath?: string, maxRequests?: number): ExtensionAPI {
+  const cap = maxRequests === undefined ? undefined : new ProviderRequestCap(maxRequests);
   if (!logPath) {
-    if (allowancePath) throw new Error("Development allowance requires a stage telemetry path");
+    if (allowancePath || cap) throw new Error("Development allowance and request cap require a stage telemetry path");
     return pi;
   }
   return new Proxy(pi, {
@@ -183,7 +205,7 @@ export function withProviderRequestTelemetry(pi: ExtensionAPI, logPath: string |
       return (...args: unknown[]) => {
         const provider = args[0];
         if (provider && typeof provider === "object" && "id" in provider && provider.id === "berget") {
-          args[0] = instrumentProvider(provider as Provider, logPath, allowancePath);
+          args[0] = instrumentProvider(provider as Provider, logPath, allowancePath, cap);
         }
         return Reflect.apply(target.registerProvider, target, args);
       };
