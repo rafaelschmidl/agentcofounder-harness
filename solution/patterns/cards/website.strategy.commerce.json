@@ -2,7 +2,7 @@
   "id": "website.strategy.commerce@1.0.0",
   "title": "Commerce storefront website",
   "summary": "A store whose website converts browsing into buying: catalogue browsing, product decisions in a detail page, cart management, and a trustworthy checkout.",
-  "signals": ["shop", "storefront", "store", "boutique", "webshop", "retail", "merch", "merchandise", "goods", "products for sale"],
+  "signals": ["shop", "storefront", "webshop", "retail", "boutique", "merch", "merchandise", "goods", "add to cart", "buy now", "in stock", "sold out", "free shipping", "return policy", "size guide"],
   "capabilities": ["product-catalogue", "product-detail", "cart", "checkout-flow", "order-confirmation", "shipping-information", "sale-promotions"],
   "defaults": ["Lead every view with the primary buy action", "Attach price and stock next to the add-to-cart control", "Show the cart as a dedicated view, not only a counter", "End checkout in a clear order confirmation"],
   "risks": ["Flat catalogue with no product detail view", "Cart reduced to a counter with no editable view", "Checkout without totals or confirmation"],

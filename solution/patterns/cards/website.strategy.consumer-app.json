@@ -2,7 +2,7 @@
   "id": "website.strategy.consumer-app@1.0.0",
   "title": "Consumer app website with acquisition funnel",
   "summary": "A product site whose job is to funnel visitors into signing up or installing, set expectations of the app's core loop, and get new users to first value.",
-  "signals": ["social", "friends", "habit", "fun", "logo", "brand", "download", "mobile", "feed", "streak", "gamified"],
+  "signals": ["sign up", "get started", "download", "install", "free account", "create account", "login", "app store", "streak", "daily goal", "onboarding", "quiz", "social", "friends", "habit"],
   "capabilities": ["signup-funnel", "first-run-onboarding", "core-loop-preview", "social-proof", "simple-value-proposition"],
   "defaults": ["Make signup or install the single dominant action", "Preview the app's actual core surfaces, not marketing abstractions", "Treat onboarding and first-run empty states as spec views"],
   "risks": ["Marketing copy with no visible product surfaces", "Signup not modeled as a first-class flow", "Missing empty or first-run states"],

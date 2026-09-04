@@ -2,7 +2,7 @@
   "id": "website.strategy.saas-demo@1.0.0",
   "title": "SaaS product website with demo-request motion",
   "summary": "A software product site whose job is to prove value fast and convert visitors into booked demos or qualified leads through visual proof, pricing logic, and social evidence.",
-  "signals": ["saas", "b2b", "demo", "platform", "software", "solution", "enterprise", "teams", "sales", "pipeline", "leads"],
+  "signals": ["saas", "b2b", "demo", "book a demo", "demo request", "free trial", "per seat", "contact sales", "enterprise", "solution", "software", "pricing tier", "case study", "compliance", "integrations"],
   "capabilities": ["value-proposition-hero", "feature-tour", "pricing-tiers", "customer-evidence", "demo-request-form", "faq"],
   "defaults": ["Make the demo or contact request the single dominant CTA", "Show the product itself, not only abstractions", "Anchor credibility with customer evidence and pricing logic"],
   "risks": ["Feature paragraphs without any product visual", "No pricing page at all", "No single obvious demo or contact path"],

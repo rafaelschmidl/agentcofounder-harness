@@ -2,7 +2,7 @@
   "id": "website.strategy.marketplace@1.0.0",
   "title": "Two-sided marketplace website",
   "summary": "A platform site where buyers and sellers must find each other and transact: searchable listings, rich listing detail, a trust layer, and a parallel funnel for the scarce supply side.",
-  "signals": ["marketplace", "listings", "buyers", "sellers", "rental", "hosts", "providers", "peer-to-peer", "vendors", "two-sided"],
+  "signals": ["marketplace", "listings", "sellers", "buyers", "hosts", "rental", "gigs", "vendors", "peer-to-peer", "two-sided", "verified", "instant book", "browse", "filter", "commission"],
   "capabilities": ["listing-search", "listing-detail", "buyer-flow", "seller-onboarding", "trust-signals", "reviews-and-ratings"],
   "defaults": ["Search or browse the listings in one step from the landing view", "Model buyer and seller as distinct roles with separate paths", "Show trust signals (ratings, reviews, profiles) next to every offer"],
   "risks": ["Single undifferentiated user role instead of the two sides", "No search-plus-filter pattern for discovering listings", "Trust layer (reviews, ratings) missing from offers"],
